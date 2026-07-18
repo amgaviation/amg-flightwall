@@ -26,7 +26,7 @@ configuration of any AMG-owned or commercial FlightWall unit.
 - The display may be a serial/addressable LED topology with a low practical
   refresh rate; this needs measurement on the actual product.
 
-## AMG FlightWall Mini inspection — 2026-07-17
+## AMG FlightWall Mini inspection — 2026-07-18
 
 **Verified Current Fact:** Owner-supplied photographs identify the installed
 controller as an HD-WF2 with a `V7.2.0-2` board marking. The owner states this
@@ -37,17 +37,46 @@ display rendered coherent content. This verifies basic power-up only; current,
 voltage stability, thermal behavior, pixel mapping, and long-run reliability
 were not measured.
 
-**Verified Current Fact:** A direct USB-A-to-USB-C attempt did not enumerate a
-new USB device on the connected Mac. No firmware read, write, erase, flash, or
-backup occurred.
+**Verified Current Fact:** The controller enumerates on macOS as Espressif's
+native USB JTAG/serial interface (`VID 303A`, `PID 1001`) at
+`/dev/cu.usbmodem101`. It requires no CH340, CP210x, or FTDI driver.
 
-**Planning Assumption:** A 128×64 host profile is being used for layout work
-while the exact active pixel geometry, scan mode, orientation, HUB75 mapping,
-controller MCU, and flash organization remain pending measurement.
+**Verified Current Fact:** Read-only chip identification reports an
+ESP32-S3 (QFN56), revision 0.2, with Wi-Fi, Bluetooth LE 5, dual main cores,
+an LP core, a 40 MHz crystal, native USB-Serial/JTAG mode, and 8 MB of quad
+SPI flash. The controller reports no PSRAM capacity fuse.
 
-**Recommendation:** Keep software work on the host simulator until the factory
-firmware is captured, hashed, and its restore path is validated. Do not connect
-wall power and computer USB simultaneously during controller investigation.
+**Verified Current Fact:** Read-only eFuse inspection reports Secure Boot and
+flash encryption disabled. USB Serial/JTAG and USB download mode are enabled.
+These settings describe the inspected factory controller only; they are not a
+production security approval.
+
+**Verified Current Fact:** A complete 8,388,608-byte read-only flash snapshot
+was captured on 2026-07-18. Its SHA-256 is
+`1160af2e1da2ea57baf6a7833cf0121812a576ea2cef29440f5f5ab612299f6a`.
+The binary is deliberately local and ignored by Git. No erase, write, or flash
+operation was issued.
+
+**Verified Current Fact:** The snapshot's partition table defines `nvs`
+(`0x9000`, 20 KB), `otadata` (`0xE000`, 8 KB), two application slots—`app0`
+(`0x10000`, 2.75 MB) and `app1` (`0x2D0000`, 2.75 MB)—`factoryprov`
+(`0x590000`, 4 KB), and `spiffs` (`0x591000`, approximately 2.43 MB). This is
+an A/B-capable partition layout, but it does not prove the vendor's OTA
+implementation or rollback behavior.
+
+**Verified Current Fact:** The display panels are marked as 128×64,
+1/32-scan hardware and visibly use FM6124E driver ICs. The exact pixel order,
+orientation, color order, HUB75 pin mapping, and refresh behavior remain
+unmeasured.
+
+**Planning Assumption:** A 128×64 host profile is appropriate for Mini layout
+work. Orientation, color order, HUB75 mapping, and refresh behavior remain
+pending measurement.
+
+**Recommendation:** Keep software work on the host simulator and add only
+read-only target inspection until restoration has succeeded on a sacrificial or
+dedicated development controller. Do not connect wall power and computer USB
+simultaneously during controller investigation.
 
 ## Required inspection record
 
@@ -74,7 +103,8 @@ thermal limits, and installation requirements.
 ## Open decisions
 
 - Exact production hardware revision and supported variants.
-- Whether the existing controller can safely support A/B OTA partitions.
+- Whether the existing controller's observed A/B partition layout can safely
+  support AMG-signed OTA updates and rollback.
 - Required brightness/current limiting and thermal derating policy.
 - Whether a companion computer is required for Operations Mode or web UI.
 - Regulatory, installation, and serviceability requirements by sales region.

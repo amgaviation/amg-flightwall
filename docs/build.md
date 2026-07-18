@@ -10,9 +10,15 @@ plugin registry, simulator, and dependency-free tests.
 strict warnings, runs seven deterministic tests, runs the simulator, and checks
 that Classic and Operations PPM frames were produced.
 
+**Verified Current Fact:** The inspected Mini controller is an ESP32-S3 with
+8 MB of quad SPI flash and no PSRAM capacity fuse. Its factory snapshot uses
+two 2.75 MB application slots plus a SPIFFS partition. The source and hash of
+that local recovery snapshot are recorded in `docs/hardware.md`; the binary is
+not committed to this repository.
+
 **Planning Assumption:** The simulator's 128×64 geometry is useful for Mini
-layout development. It does not prove the physical panel geometry, mapping,
-orientation, color order, refresh behavior, or controller compatibility.
+layout development. It does not prove mapping, orientation, color order,
+refresh behavior, or the compatibility of a new rendering driver.
 
 **Verified Current Fact:** The inspected open-source reference uses PlatformIO
 with the `espressif32` platform, `esp32dev` board, Arduino framework, and Unity
@@ -57,6 +63,7 @@ layout, recovery procedure, and isolated signing design.
 
 ## Flashing gate
 
-No generic flash command is documented because the controller and recovery path
-are unverified. Add it only after an authorized backup and a successful restore
-on a sacrificial or dedicated development unit.
+No generic flash command is documented. The factory controller is now backed
+up, but restoration has not been validated. Add a target build, package,
+signing, or flash command only after a successful restoration test on a
+sacrificial or dedicated development unit.

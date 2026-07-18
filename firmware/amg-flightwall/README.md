@@ -14,6 +14,8 @@ contain a hardware driver or flash command.
 
 ## Boundaries
 
-The sample scenes use synthetic data. The 128×64 profile is a planning
-assumption. No controller, panel, network provider, storage, web configuration,
-OTA, or production security behavior is claimed.
+The sample scenes use synthetic data. The inspected FlightWall Mini has a
+128×64 1/32-scan panel and an ESP32-S3 controller with 8 MB flash, but its
+mapping, orientation, color order, refresh behavior, and driver integration
+remain unmeasured. No network provider, storage, web configuration, OTA, or
+production security behavior is claimed.
