@@ -8,8 +8,8 @@ plugin registry, configuration validation, Wi-Fi supervision policy, typed
 health registry, simulator, and dependency-free tests.
 
 **Verified Current Fact:** `./scripts/check.sh` builds with Apple Clang 17 using
-strict warnings, runs 23 deterministic tests, runs the simulator, and checks
-that Classic and Operations PPM frames were produced.
+strict warnings, runs 25 deterministic tests, runs the simulator, and checks
+that Classic, Operations, and hardware-smoke PPM frames were produced.
 
 **Verified Current Fact:** The inspected Mini controller is an ESP32-S3 with
 8 MB of quad SPI flash and no PSRAM capacity fuse. Its factory snapshot uses
@@ -68,6 +68,11 @@ The `hd-wf2` command compiles only. Its PlatformIO safety gate rejects `upload`,
 `uploadfs`, `program`, and `erase` targets. The Espressif platform and HUB75
 driver are pinned, and the partition CSV mirrors the read-only factory
 snapshot.
+
+**Verified Current Fact:** The current smoke-screen target compiles to 287,045
+bytes of application flash usage and 43,528 bytes of RAM usage under the
+PlatformIO size report. The generated flash image is 287,408 bytes and contains
+flash-mapped DROM/IROM segments, so it is not a RAM-loadable image.
 
 ## Planned target commands
 

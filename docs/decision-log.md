@@ -71,6 +71,18 @@
 - **Reason:** Makes the default diagnostic path bounded and secret-free by
   construction.
 
+### D-009 — Visible hardware progress remains behind the write gate
+
+- **Status:** Accepted for the HD-WF2 prototype
+- **Decision:** Make the compile-only target boot into a dedicated smoke screen.
+  Only facts observable by the running firmware may leave `WAIT`: the target
+  build and render loop report `RUN`. Host tests, factory-backup hash, and
+  source-gate evidence remain external preflight results and are not embedded
+  as pass claims. Do not weaken the device-write safety gate.
+- **Reason:** Provides an immediately recognizable hardware acceptance artifact
+  without turning compilation into a compatibility claim or risking the sole
+  factory controller.
+
 ## Open decisions
 
 | ID | Decision | Evidence/owner needed |

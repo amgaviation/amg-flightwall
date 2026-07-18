@@ -59,6 +59,12 @@ Diagnostics       Local web config   OTA/recovery supervisor
 a platform-neutral `WifiSupervisor`, and a fixed-size `HealthRegistry` without
 network-adapter, credential-store, persistent-storage, or hardware dependencies.
 
+**Verified Current Fact:** `HardwareSmokeScene` renders typed host-test, build,
+factory-backup-hash, hardware-test, and source-gate states on the portable
+display interface. Its running state pulses from the supplied monotonic clock.
+The generic composition defaults external evidence to `WAIT`; the embedded
+composition asserts only its active target build and render loop as `RUN`.
+
 **Verified Current Fact:** The simulator uses an in-memory RGB framebuffer and
 exports PPM images. The Classic and Operations scenes contain synthetic data
 only; they are layout prototypes, not a fidelity claim or live integration.

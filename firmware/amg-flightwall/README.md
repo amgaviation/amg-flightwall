@@ -15,6 +15,8 @@ experimental compile-only HD-WF2 display adapter. It contains no flash command.
 - bounded Wi-Fi retry/backoff, disconnect actions, and explicit reprovisioning
   policy;
 - fixed-size, typed health diagnostics without free-text payloads;
+- 128×64 hardware smoke-test scene with typed progress states and a pulsing
+  runtime indicator;
 - 128×64 simulator output and dependency-free tests;
 - build-only ESP32-S3/HD-WF2 adapter with a fixed-size shadow framebuffer,
   source-derived HUB75 pin profile, FM6124 initialization, conservative
