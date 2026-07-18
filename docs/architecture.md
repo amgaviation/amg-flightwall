@@ -61,9 +61,11 @@ Diagnostics       Local web config   OTA/recovery supervisor
 exports PPM images. The Classic and Operations scenes contain synthetic data
 only; they are layout prototypes, not a fidelity claim or live integration.
 
-**Recommendation:** Reuse these inward-facing contracts for the embedded target
-only after memory, allocation, error, timing, and toolchain behavior are measured
-on the approved controller.
+**Recommendation:** A compile-only adapter may reuse these inward-facing
+contracts without touching a controller. Activating that adapter on hardware or
+claiming compatibility requires memory, allocation, error, timing, panel
+mapping, and toolchain behavior to be measured on an approved development
+controller.
 
 ## Runtime modes
 

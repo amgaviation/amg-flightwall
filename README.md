@@ -7,8 +7,9 @@ not a firmware dependency.
 
 > **Status:** The portable Phase 2 core and 128×64 host simulator are prototypes.
 > Host build/tests and generated preview frames are verified on Apple Clang 17.
-> Hardware compatibility, flashing, OTA, external APIs, and target performance
-> remain unverified.
+> The experimental HD-WF2 target compiles but has not run on hardware. Hardware
+> compatibility, flashing, OTA, external APIs, and target performance remain
+> unverified.
 
 ## Project rules
 
@@ -87,7 +88,11 @@ amg-flightwall/
 └── backups/                  # manifests/instructions only; no secrets or dumps
 ```
 
-## Before hardware-target implementation
+## Before hardware activation
+
+Compile-only adapter development may proceed without connecting to or writing
+the controller. Uploading, programming, erasing, runtime compatibility claims,
+and production target approval remain gated on the following:
 
 1. Identify the exact production controller, panel chipset, wiring topology,
    power design, and recovery interface from physical inspection.

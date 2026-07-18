@@ -1,0 +1,21 @@
+{
+  "procedure_version": "0.1",
+  "captured_at_utc": "2026-07-18T19:03:27Z",
+  "device_alias": "flightwall-mini-lab-01",
+  "controller": "Huidu HD-WF2 V7.2.0-2",
+  "chip": "ESP32-S3 QFN56 revision 0.2",
+  "flash_bytes": 8388608,
+  "sha256": "1160af2e1da2ea57baf6a7833cf0121812a576ea2cef29440f5f5ab612299f6a",
+  "capture_tool": "esptool 5.3.1",
+  "capture_mode": "read-only",
+  "full_read_count": 1,
+  "validation_status": "captured_unvalidated",
+  "restore_tested": false,
+  "device_write_performed": false,
+  "notes": [
+    "The binary is stored locally under backups/local and ignored by Git.",
+    "Post-reset spot reads showed runtime changes in the NVS region, so no claim of two identical full reads is made.",
+    "No erase, program, upload, or flash operation was issued."
+  ]
+}
+

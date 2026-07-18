@@ -73,10 +73,22 @@ unmeasured.
 work. Orientation, color order, HUB75 mapping, and refresh behavior remain
 pending measurement.
 
-**Recommendation:** Keep software work on the host simulator and add only
-read-only target inspection until restoration has succeeded on a sacrificial or
-dedicated development controller. Do not connect wall power and computer USB
-simultaneously during controller investigation.
+**Planning Assumption:** The build-only HD-WF2 adapter uses the pin order
+published by WLED at commit `a962116f54bc3b62db46013849f0bf5b3ebabb73`:
+R1/G1/B1 `2/6/10`, R2/G2/B2 `3/7/11`, A/B/C/D/E
+`39/38/37/36/21`, LAT/OE/CLK `33/35/34`. This profile compiles and agrees with
+the controller family, but it has not been electrically verified on this Mini.
+See [WLED's HD-WF2 definition](https://github.com/wled/WLED/blob/a962116f54bc3b62db46013849f0bf5b3ebabb73/wled00/bus_manager.cpp#L870-L876).
+
+**Planning Assumption:** The experimental target disables PSRAM because the
+eFuse report exposes no PSRAM capacity and the maintained WLED HD-WF2 profile
+also disables it. This is a conservative build configuration, not proof that no
+external PSRAM package exists on every HD-WF2 revision.
+
+**Recommendation:** Continue host simulation and compile-only adapter work, but
+limit controller interaction to read-only inspection until restoration has
+succeeded on a sacrificial or dedicated development controller. Do not connect
+wall power and computer USB simultaneously during controller investigation.
 
 ## Required inspection record
 

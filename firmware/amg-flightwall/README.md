@@ -1,7 +1,7 @@
 # AMG FlightWall Portable Core
 
-This directory contains the greenfield, host-buildable product core. It does not
-contain a hardware driver or flash command.
+This directory contains the greenfield product core, host simulator, and an
+experimental compile-only HD-WF2 display adapter. It contains no flash command.
 
 ## Implemented
 
@@ -11,6 +11,9 @@ contain a hardware driver or flash command.
 - deterministic Classic/Operations/Auto mode selection;
 - manifest validation and duplicate/API checks for statically linked plugins;
 - 128×64 simulator output and dependency-free tests.
+- build-only ESP32-S3/HD-WF2 adapter with a fixed-size shadow framebuffer,
+  source-derived HUB75 pin profile, FM6124 initialization, conservative
+  brightness, and four-bit DMA color depth with PSRAM disabled.
 
 ## Boundaries
 
@@ -19,3 +22,8 @@ The sample scenes use synthetic data. The inspected FlightWall Mini has a
 mapping, orientation, color order, refresh behavior, and driver integration
 remain unmeasured. No network provider, storage, web configuration, OTA, or
 production security behavior is claimed.
+
+The embedded environment intentionally blocks PlatformIO `upload`, `uploadfs`,
+`program`, and `erase` targets. It is not authorized for the factory controller
+until the recovery image has been restored successfully on a dedicated
+development unit.
