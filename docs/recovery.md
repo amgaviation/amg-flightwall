@@ -2,16 +2,22 @@
 
 ## Current status
 
-**Verified Current Fact:** The factory-unmodified FlightWall Mini was inspected
-and its ESP32-S3 controller was identified read-only. One complete 8 MB flash
-snapshot was captured with esptool 5.3.1. The redacted manifest is stored at
-`backups/manifests/flightwall-mini-hd-wf2-20260718.json`; the binary remains
-local and ignored by Git.
+**Verified Current Fact:** The initially factory-unmodified FlightWall Mini was
+inspected and its ESP32-S3 controller was identified read-only. One complete
+8 MB flash snapshot was captured with esptool 5.3.1. The redacted manifest is
+stored at `backups/manifests/flightwall-mini-hd-wf2-20260718.json`; the binary
+remains local and ignored by Git.
 
-**Verified Current Fact:** No erase, upload, program, or flash operation was
-issued. Restoration has not been tested. Post-reset spot reads showed changes
-inside the runtime NVS area, so the snapshot is preserved but is not described
-as a twice-read or restore-validated recovery artifact.
+**Verified Current Fact:** Before the owner-authorized smoke activation, a
+second complete 8 MB snapshot was captured. Immutable regions matched the first
+snapshot; runtime NVS accounted for the full-image hash difference. A restore
+slice for `app0` was extracted, and the untouched factory `app1` remains in
+flash. These are stronger recovery inputs, but restoration is still untested.
+
+**Verified Current Fact:** The smoke artifact was written only to `app0` at
+`0x10000`. The exact written range was read back and matched the compiled
+artifact SHA-256. See the activation manifest at
+`backups/manifests/flightwall-mini-hd-wf2-smoke-activation-20260718.json`.
 
 **Recommendation:** Treat recovery as a prerequisite to firmware development,
 not a final OTA feature.

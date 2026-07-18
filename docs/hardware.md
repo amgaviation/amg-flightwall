@@ -29,8 +29,8 @@ configuration of any AMG-owned or commercial FlightWall unit.
 ## AMG FlightWall Mini inspection — 2026-07-18
 
 **Verified Current Fact:** Owner-supplied photographs identify the installed
-controller as an HD-WF2 with a `V7.2.0-2` board marking. The owner states this
-FlightWall Mini is factory-unmodified.
+controller as an HD-WF2 with a `V7.2.0-2` board marking. The owner stated this
+FlightWall Mini was factory-unmodified before the 2026-07-18 smoke activation.
 
 **Verified Current Fact:** The factory power path powered the display and the
 display rendered coherent content. This verifies basic power-up only; current,
@@ -55,7 +55,16 @@ production security approval.
 was captured on 2026-07-18. Its SHA-256 is
 `1160af2e1da2ea57baf6a7833cf0121812a576ea2cef29440f5f5ab612299f6a`.
 The binary is deliberately local and ignored by Git. No erase, write, or flash
-operation was issued.
+operation had been issued at the time of that snapshot.
+
+**Verified Current Fact:** Before the owner-authorized smoke activation, a
+second complete pre-flash snapshot was captured. All regions outside runtime
+NVS matched the first snapshot. The smoke artifact was then written only to
+`app0` at `0x10000`; its post-write readback matched the compiled artifact, and
+serial boot reached the smoke-screen initialization marker. Factory `app1`,
+bootloader, partition table, OTA metadata, NVS, factory provisioning, and
+SPIFFS were not written. A 120-second serial watch recorded no unexpected
+reset after initialization.
 
 **Verified Current Fact:** The snapshot's partition table defines `nvs`
 (`0x9000`, 20 KB), `otadata` (`0xE000`, 8 KB), two application slots—`app0`
@@ -85,10 +94,10 @@ eFuse report exposes no PSRAM capacity and the maintained WLED HD-WF2 profile
 also disables it. This is a conservative build configuration, not proof that no
 external PSRAM package exists on every HD-WF2 revision.
 
-**Recommendation:** Continue host simulation and compile-only adapter work, but
-limit controller interaction to read-only inspection until restoration has
-succeeded on a sacrificial or dedicated development controller. Do not connect
-wall power and computer USB simultaneously during controller investigation.
+**Recommendation:** Treat the owner-authorized app0 activation as a controlled
+prototype exception. Keep generic write targets disabled, preserve both local
+snapshots and the untouched factory `app1`, and complete restoration and
+electrical validation before broader hardware use.
 
 ## Required inspection record
 
@@ -107,10 +116,11 @@ Before connecting, flashing, or powering development hardware, record:
 ## Safety boundary
 
 **Recommendation:** Use a current-limited bench supply and an electrically
-reviewed test fixture for first power-on. Do not infer safe power wiring from
-the reference illustration. Do not flash the only known-good controller. A
-qualified engineer must approve mains wiring, grounding, overcurrent protection,
-thermal limits, and installation requirements.
+reviewed test fixture for future development. Do not infer safe power wiring
+from the reference illustration. The owner authorized one app0-only exception
+on the sole controller; do not generalize it. A qualified engineer must approve
+mains wiring, grounding, overcurrent protection, thermal limits, and
+installation requirements.
 
 ## Open decisions
 
