@@ -4,10 +4,11 @@
 
 **Verified Current Fact:** The repository contains a portable C++17 core, host
 framebuffer, renderer, application/mode controller, two prototype scenes,
-plugin registry, simulator, and dependency-free tests.
+plugin registry, configuration validation, Wi-Fi supervision policy, typed
+health registry, simulator, and dependency-free tests.
 
 **Verified Current Fact:** `./scripts/check.sh` builds with Apple Clang 17 using
-strict warnings, runs eight deterministic tests, runs the simulator, and checks
+strict warnings, runs 23 deterministic tests, runs the simulator, and checks
 that Classic and Operations PPM frames were produced.
 
 **Verified Current Fact:** The inspected Mini controller is an ESP32-S3 with

@@ -49,7 +49,9 @@ jobs:
 
       - name: Verify device-write safety gate
         run: |
-          if pio run --project-dir firmware/amg-flightwall --environment hd_wf2_build_only --target upload --upload-port /dev/null; then
-            echo "safety gate unexpectedly allowed an upload target" >&2
-            exit 1
-          fi
+          for blocked_target in upload uploadfs program erase; do
+            if pio run --project-dir firmware/amg-flightwall --environment hd_wf2_build_only --target "$blocked_target" --upload-port /dev/null; then
+              echo "safety gate unexpectedly allowed $blocked_target" >&2
+              exit 1
+            fi
+          done

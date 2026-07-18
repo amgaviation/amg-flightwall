@@ -34,11 +34,42 @@
 
 ### D-005 — Dependency-free host core first
 
-- **Status:** Accepted for the portable prototype
+- **Status:** Accepted; embedded-framework restriction superseded by D-006
 - **Decision:** Use C++17, GNU Make, and an in-memory display adapter for the
-  first runnable slice. Do not select or install an embedded framework yet.
+  first runnable slice. The original restriction on selecting an embedded
+  framework applied until controller evidence and a safe compile-only boundary
+  existed.
 - **Reason:** Enables testable product progress without writing to unknown
   hardware or locking the platform to an unverified controller/toolchain.
+
+### D-006 — Experimental embedded target remains compile-only
+
+- **Status:** Accepted for the HD-WF2 prototype
+- **Decision:** Pin the experimental PlatformIO target and HUB75 dependency,
+  block PlatformIO `upload`, `uploadfs`, `program`, and `erase` targets, and
+  treat compilation as evidence only—not hardware compatibility or
+  production-toolchain approval.
+- **Reason:** Exercises the target boundary without risking the sole factory
+  controller or overstating runtime verification.
+
+### D-007 — Configuration references secrets by opaque profile key/revision
+
+- **Status:** Accepted for the portable prototype
+- **Decision:** Ordinary configuration may contain a validated opaque numeric
+  Wi-Fi profile key and revision but never a plaintext password or token. A
+  future platform adapter must resolve that reference through a separate
+  secret-storage interface.
+- **Reason:** Reduces accidental exposure in configuration export, diagnostics,
+  backup, and browser responses.
+
+### D-008 — Diagnostics are typed and payload-free by default
+
+- **Status:** Accepted for the portable prototype
+- **Decision:** Core health reports contain only subsystem, severity, typed
+  status code, and timestamp. They do not accept free-text messages or provider
+  payloads.
+- **Reason:** Makes the default diagnostic path bounded and secret-free by
+  construction.
 
 ## Open decisions
 

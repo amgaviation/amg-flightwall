@@ -33,8 +33,9 @@ It is licensed under Apache License 2.0. No upstream source is copied here.
 
 The AMG implementation now includes a dependency-free C++17 core with a display
 port, framebuffer, renderer, scene lifecycle, Classic/Operations scenes,
-deterministic Auto mode, and plugin manifest registry. The host simulator does
-not connect to or modify a FlightWall controller.
+deterministic Auto mode, plugin manifest registry, versioned configuration
+validation, a portable Wi-Fi supervision policy, and typed health diagnostics.
+The host simulator does not connect to or modify a FlightWall controller.
 
 ## Build the current prototype
 
