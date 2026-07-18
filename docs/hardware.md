@@ -26,6 +26,29 @@ configuration of any AMG-owned or commercial FlightWall unit.
 - The display may be a serial/addressable LED topology with a low practical
   refresh rate; this needs measurement on the actual product.
 
+## AMG FlightWall Mini inspection — 2026-07-17
+
+**Verified Current Fact:** Owner-supplied photographs identify the installed
+controller as an HD-WF2 with a `V7.2.0-2` board marking. The owner states this
+FlightWall Mini is factory-unmodified.
+
+**Verified Current Fact:** The factory power path powered the display and the
+display rendered coherent content. This verifies basic power-up only; current,
+voltage stability, thermal behavior, pixel mapping, and long-run reliability
+were not measured.
+
+**Verified Current Fact:** A direct USB-A-to-USB-C attempt did not enumerate a
+new USB device on the connected Mac. No firmware read, write, erase, flash, or
+backup occurred.
+
+**Planning Assumption:** A 128×64 host profile is being used for layout work
+while the exact active pixel geometry, scan mode, orientation, HUB75 mapping,
+controller MCU, and flash organization remain pending measurement.
+
+**Recommendation:** Keep software work on the host simulator until the factory
+firmware is captured, hashed, and its restore path is validated. Do not connect
+wall power and computer USB simultaneously during controller investigation.
+
 ## Required inspection record
 
 Before connecting, flashing, or powering development hardware, record:

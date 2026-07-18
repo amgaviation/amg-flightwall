@@ -5,8 +5,8 @@
 ### D-001 — Greenfield project boundary
 
 - **Status:** Accepted
-- **Decision:** AMG FlightWall is isolated under `amg-flightwall/` pending a
-  standalone repository. The parent website is context only.
+- **Decision:** AMG FlightWall uses the standalone `amgaviation/amg-flightwall`
+  repository. The parent website is context only.
 - **Reason:** Prevent accidental coupling and preserve unrelated production behavior.
 
 ### D-002 — Preserve upstream firmware
@@ -26,17 +26,24 @@
 
 ### D-004 — Interface-based plugins first
 
-- **Status:** Recommended; implementation approval pending
+- **Status:** Accepted for the portable prototype
 - **Decision:** Begin with statically linked, manifest-registered plugins rather
   than arbitrary dynamically downloaded firmware modules.
 - **Reason:** Provides modularity without introducing an unbounded code-loading,
   compatibility, memory, signing, and recovery surface on constrained hardware.
 
+### D-005 — Dependency-free host core first
+
+- **Status:** Accepted for the portable prototype
+- **Decision:** Use C++17, GNU Make, and an in-memory display adapter for the
+  first runnable slice. Do not select or install an embedded framework yet.
+- **Reason:** Enables testable product progress without writing to unknown
+  hardware or locking the platform to an unverified controller/toolchain.
+
 ## Open decisions
 
 | ID | Decision | Evidence/owner needed |
 | --- | --- | --- |
-| O-001 | Standalone repo location and visibility | Project owner/GitHub admin |
 | O-002 | Product license and upstream reuse policy | Owner and legal review |
 | O-003 | Supported hardware revisions | Physical inspection and engineering owner |
 | O-004 | Production build framework/toolchain | Hardware evidence and reproducibility spike |

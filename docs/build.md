@@ -2,8 +2,17 @@
 
 ## Current status
 
-**Verified Current Fact:** This foundation contains no AMG firmware source and
-therefore intentionally has no firmware build command yet.
+**Verified Current Fact:** The repository contains a portable C++17 core, host
+framebuffer, renderer, application/mode controller, two prototype scenes,
+plugin registry, simulator, and dependency-free tests.
+
+**Verified Current Fact:** `./scripts/check.sh` builds with Apple Clang 17 using
+strict warnings, runs seven deterministic tests, runs the simulator, and checks
+that Classic and Operations PPM frames were produced.
+
+**Planning Assumption:** The simulator's 128×64 geometry is useful for Mini
+layout development. It does not prove the physical panel geometry, mapping,
+orientation, color order, refresh behavior, or controller compatibility.
 
 **Verified Current Fact:** The inspected open-source reference uses PlatformIO
 with the `espressif32` platform, `esp32dev` board, Arduino framework, and Unity
@@ -30,20 +39,21 @@ Before adding application code, the approved build must:
    test failures, oversized partitions, or secret-scan findings.
 7. Support a clean offline rebuild from an approved dependency cache.
 
-## Planned commands
-
-These names are recommendations, not currently implemented commands:
+## Implemented commands
 
 ```sh
-./scripts/bootstrap.sh
 ./scripts/check.sh
 ./scripts/build.sh simulator
-./scripts/build.sh <approved-hardware-id>
-./scripts/package-release.sh <approved-hardware-id>
 ```
 
-The scripts should be non-interactive, safe to rerun, and refuse production
-signing without an authorized isolated signer.
+The scripts are non-interactive and safe to rerun. They create only ignored host
+artifacts under `build/host/`.
+
+## Planned target commands
+
+No embedded target, flash, package, or signing command exists yet. Those
+commands require an approved controller profile, toolchain lock, partition
+layout, recovery procedure, and isolated signing design.
 
 ## Flashing gate
 

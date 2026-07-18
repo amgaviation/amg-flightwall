@@ -1,13 +1,14 @@
 # AMG FlightWall
 
 AMG FlightWall is a greenfield, commercial-quality display platform for classic
-FlightWall functionality and future AMG Aviation operations workflows. This
-directory is intentionally isolated from the AMG website application while the
-project awaits migration to its own repository.
+FlightWall functionality and future AMG Aviation operations workflows. This is
+the standalone project repository; the AMG website remains context only and is
+not a firmware dependency.
 
-> **Status:** Phase 1 documentation foundation only. No hardware compatibility,
-> firmware build, flash, OTA path, external API integration, or performance
-> characteristic has been verified.
+> **Status:** The portable Phase 2 core and 128×64 host simulator are prototypes.
+> Host build/tests and generated preview frames are verified on Apple Clang 17.
+> Hardware compatibility, flashing, OTA, external APIs, and target performance
+> remain unverified.
 
 ## Project rules
 
@@ -28,6 +29,23 @@ on 2026-07-17. The observations captured in
 [`docs/hardware.md`](docs/hardware.md) and
 [`docs/architecture.md`](docs/architecture.md) are limited to that revision.
 It is licensed under Apache License 2.0. No upstream source is copied here.
+
+The AMG implementation now includes a dependency-free C++17 core with a display
+port, framebuffer, renderer, scene lifecycle, Classic/Operations scenes,
+deterministic Auto mode, and plugin manifest registry. The host simulator does
+not connect to or modify a FlightWall controller.
+
+## Build the current prototype
+
+Requirements: a C++17 compiler, POSIX shell, and GNU Make.
+
+```sh
+./scripts/check.sh
+./scripts/build.sh simulator
+```
+
+Simulator frames are written to `build/host/artifacts/`. Build output is ignored
+and must not be committed.
 
 ## Documentation map
 
@@ -69,11 +87,11 @@ amg-flightwall/
 └── backups/                  # manifests/instructions only; no secrets or dumps
 ```
 
-## Before firmware implementation
+## Before hardware-target implementation
 
 1. Identify the exact production controller, panel chipset, wiring topology,
    power design, and recovery interface from physical inspection.
-2. Approve the target hardware abstraction and build toolchain.
+2. Approve the target hardware adapter, flash layout, and embedded toolchain.
 3. Capture an authorized original-firmware backup and validate restoration on
    non-production hardware.
 4. Record Classic Mode behavior with an explicit visual and timing test matrix.

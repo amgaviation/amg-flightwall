@@ -51,6 +51,20 @@ Diagnostics       Local web config   OTA/recovery supervisor
 | Configuration | versioned schema, validation, atomic persistence | raw secret logging |
 | OTA | signature verification, slots, health confirmation, rollback | feature behavior |
 
+## Implemented portable slice
+
+**Verified Current Fact:** The host-buildable C++17 slice implements `Display`,
+`Renderer`, `Scene`, `SceneManager`, `ModeController`, `PluginRegistry`, and
+`Application` interfaces without network, storage, or hardware dependencies.
+
+**Verified Current Fact:** The simulator uses an in-memory RGB framebuffer and
+exports PPM images. The Classic and Operations scenes contain synthetic data
+only; they are layout prototypes, not a fidelity claim or live integration.
+
+**Recommendation:** Reuse these inward-facing contracts for the embedded target
+only after memory, allocation, error, timing, and toolchain behavior are measured
+on the approved controller.
+
 ## Runtime modes
 
 **Recommendation:** A mode controller owns exactly one active top-level mode:
