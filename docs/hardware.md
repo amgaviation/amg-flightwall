@@ -29,8 +29,8 @@ configuration of any AMG-owned or commercial FlightWall unit.
 ## AMG FlightWall Mini inspection — 2026-07-18
 
 **Verified Current Fact:** Owner-supplied photographs identify the installed
-controller as an HD-WF2 with a `V7.2.0-2` board marking. The owner states this
-FlightWall Mini is factory-unmodified.
+controller as an HD-WF2 with a `V7.2.0-2` board marking. The owner stated this
+FlightWall Mini was factory-unmodified before the 2026-07-18 smoke activation.
 
 **Verified Current Fact:** The factory power path powered the display and the
 display rendered coherent content. This verifies basic power-up only; current,
@@ -55,7 +55,16 @@ production security approval.
 was captured on 2026-07-18. Its SHA-256 is
 `1160af2e1da2ea57baf6a7833cf0121812a576ea2cef29440f5f5ab612299f6a`.
 The binary is deliberately local and ignored by Git. No erase, write, or flash
-operation was issued.
+operation had been issued at the time of that snapshot.
+
+**Verified Current Fact:** Before the owner-authorized smoke activation, a
+second complete pre-flash snapshot was captured. All regions outside runtime
+NVS matched the first snapshot. The smoke artifact was then written only to
+`app0` at `0x10000`; its post-write readback matched the compiled artifact, and
+serial boot reached the smoke-screen initialization marker. Factory `app1`,
+bootloader, partition table, OTA metadata, NVS, factory provisioning, and
+SPIFFS were not written. A 120-second serial watch recorded no unexpected
+reset after initialization.
 
 **Verified Current Fact:** The snapshot's partition table defines `nvs`
 (`0x9000`, 20 KB), `otadata` (`0xE000`, 8 KB), two application slots—`app0`
@@ -69,26 +78,62 @@ implementation or rollback behavior.
 orientation, color order, HUB75 pin mapping, and refresh behavior remain
 unmeasured.
 
+**Verified Current Fact:** Both preserved factory application images contain
+the same HUB75 GPIO order: R1/G1/B1 `2/6/10`, R2/G2/B2 `3/7/11`, A/B/C/D/E
+`39/38/37/36/21`, and LAT/OE/CLK `33/35/34`. Factory app0 configures a
+64×64 physical module with chain length two, FM6126A-family initialization,
+an 8 MHz clock, latch blanking two, false clock phase, 60 Hz minimum refresh,
+eight-bit color depth, and startup brightness 160. Its MatrixPanel ABI contains
+a line-decoder field that the factory constructor does not explicitly
+initialize, so the exact decoder enum is not a verified factory setting.
+These facts were derived from the saved factory binaries; they do not prove
+electrical signal presence at the panel.
+
+**Verified Current Fact:** Each saved factory application contains the exact
+14-byte X1 GPIO array once at application offset `0x3129`, and the factory
+display-construction path copies those 14 values into the MatrixPanel
+configuration. No additional panel, buffer, or power-enable GPIO was found in
+that path. Independent HD-WF2 implementations also use only these 14 lines;
+see [WLED's pinned definition](https://github.com/wled/WLED/blob/a962116f54bc3b62db46013849f0bf5b3ebabb73/wled00/bus_manager.cpp#L870-L876)
+and the
+[MatrixPanel HD-WF2 bring-up record](https://github.com/mrcodetastic/ESP32-HUB75-MatrixPanel-DMA/issues/433).
+There is no public schematic for the inspected V7.2.0-2 board, so this does not
+replace an electrical measurement.
+
+**Verified Current Fact:** The saved factory app0 was restored and verified,
+then a library-free raw GPIO diagnostic independently drove the same pins and
+FM6124E control sequence. The raw diagnostic's execution was confirmed by
+serial heartbeats while the owner observed a completely blank panel. Factory
+application execution after the verified restore was not independently
+established. The raw artifact's exact post-flash readback matched SHA-256
+`732196319ebbfb488c7ecbe1ca0c32c1c44553ce506c9e6155782f3eddc20f66`.
+No panel-side voltage, current, or logic-level measurement has been made, so
+panel power, connector continuity, level shifting, and panel electronics
+remain unresolved.
+
 **Planning Assumption:** A 128×64 host profile is appropriate for Mini layout
 work. Orientation, color order, HUB75 mapping, and refresh behavior remain
 pending measurement.
 
-**Planning Assumption:** The build-only HD-WF2 adapter uses the pin order
-published by WLED at commit `a962116f54bc3b62db46013849f0bf5b3ebabb73`:
-R1/G1/B1 `2/6/10`, R2/G2/B2 `3/7/11`, A/B/C/D/E
-`39/38/37/36/21`, LAT/OE/CLK `33/35/34`. This profile compiles and agrees with
-the controller family, but it has not been electrically verified on this Mini.
-See [WLED's HD-WF2 definition](https://github.com/wled/WLED/blob/a962116f54bc3b62db46013849f0bf5b3ebabb73/wled00/bus_manager.cpp#L870-L876).
+**Recommendation:** Keep the factory-derived pin profile as the target baseline,
+but do not describe it as electrically verified until logic activity is
+measured at controller X1 and panel J1. It also agrees with
+[WLED's HD-WF2 definition](https://github.com/wled/WLED/blob/a962116f54bc3b62db46013849f0bf5b3ebabb73/wled00/bus_manager.cpp#L870-L876).
 
 **Planning Assumption:** The experimental target disables PSRAM because the
 eFuse report exposes no PSRAM capacity and the maintained WLED HD-WF2 profile
 also disables it. This is a conservative build configuration, not proof that no
 external PSRAM package exists on every HD-WF2 revision.
 
-**Recommendation:** Continue host simulation and compile-only adapter work, but
-limit controller interaction to read-only inspection until restoration has
-succeeded on a sacrificial or dedicated development controller. Do not connect
-wall power and computer USB simultaneously during controller investigation.
+**Recommendation:** Treat the owner-authorized app0 activation as a controlled
+prototype exception. Keep generic write targets disabled, preserve both local
+snapshots and the untouched factory `app1`, and complete restoration and
+electrical validation before broader hardware use.
+
+**Recommendation:** Before another panel test, measure 5 V at the panel's
+four-pin power connector under load. If the rail is correct, measure or trace
+OE, CLK, LAT, and one RGB lane across X1, the ribbon, and J1. Do not infer panel
+power from the controller's power LED.
 
 ## Required inspection record
 
@@ -107,10 +152,11 @@ Before connecting, flashing, or powering development hardware, record:
 ## Safety boundary
 
 **Recommendation:** Use a current-limited bench supply and an electrically
-reviewed test fixture for first power-on. Do not infer safe power wiring from
-the reference illustration. Do not flash the only known-good controller. A
-qualified engineer must approve mains wiring, grounding, overcurrent protection,
-thermal limits, and installation requirements.
+reviewed test fixture for future development. Do not infer safe power wiring
+from the reference illustration. The owner authorized one app0-only exception
+on the sole controller; do not generalize it. A qualified engineer must approve
+mains wiring, grounding, overcurrent protection, thermal limits, and
+installation requirements.
 
 ## Open decisions
 

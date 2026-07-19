@@ -71,6 +71,28 @@
 - **Reason:** Makes the default diagnostic path bounded and secret-free by
   construction.
 
+### D-009 — Visible hardware progress remains behind the write gate
+
+- **Status:** Accepted for the HD-WF2 prototype
+- **Decision:** Make the compile-only target boot into a dedicated smoke screen.
+  Only facts observable by the running firmware may leave `WAIT`: the target
+  build and render loop report `RUN`. Host tests, factory-backup hash, and
+  source-gate evidence remain external preflight results and are not embedded
+  as pass claims. Do not weaken the device-write safety gate.
+- **Reason:** Provides an immediately recognizable hardware acceptance artifact
+  without turning compilation into a compatibility claim.
+
+### D-010 — Owner-authorized app0 smoke activation is a documented exception
+
+- **Status:** Accepted as a one-device prototype exception
+- **Decision:** After explicit owner direction to proceed without a spare,
+  preserve a second full snapshot and app0 restore slice, write only the active
+  app0 partition, preserve factory app1 and all other regions, verify exact
+  readback, and keep all generic PlatformIO write targets blocked.
+- **Reason:** Delivers visible hardware evidence while bounding the explicitly
+  accepted residual risk. This does not satisfy restoration, electrical,
+  production security, or release-readiness gates.
+
 ## Open decisions
 
 | ID | Decision | Evidence/owner needed |

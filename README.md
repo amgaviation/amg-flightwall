@@ -35,6 +35,7 @@ The AMG implementation now includes a dependency-free C++17 core with a display
 port, framebuffer, renderer, scene lifecycle, Classic/Operations scenes,
 deterministic Auto mode, plugin manifest registry, versioned configuration
 validation, a portable Wi-Fi supervision policy, and typed health diagnostics.
+It also renders a hardware smoke-test progress screen for the 128×64 profile.
 The host simulator does not connect to or modify a FlightWall controller.
 
 ## Build the current prototype
@@ -57,6 +58,7 @@ and must not be committed.
 | [`docs/development.md`](docs/development.md) | Contributor workflow and quality gates |
 | [`docs/build.md`](docs/build.md) | Reproducible build plan and current limitations |
 | [`docs/hardware.md`](docs/hardware.md) | Evidence-backed hardware baseline and unknowns |
+| [`docs/hardware-smoke-test.md`](docs/hardware-smoke-test.md) | Visible smoke screen, preflight, and activation gate |
 | [`docs/recovery.md`](docs/recovery.md) | Recovery and rollback design requirements |
 | [`docs/roadmap.md`](docs/roadmap.md) | Gated delivery phases and acceptance evidence |
 | [`docs/decision-log.md`](docs/decision-log.md) | Decisions and unresolved choices |

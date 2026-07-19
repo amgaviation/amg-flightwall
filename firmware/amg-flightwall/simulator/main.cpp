@@ -6,6 +6,7 @@
 
 #include "amg/flightwall/application.hpp"
 #include "amg/flightwall/display.hpp"
+#include "amg/flightwall/hardware_smoke_scene.hpp"
 #include "amg/flightwall/renderer.hpp"
 #include "amg/flightwall/scenes.hpp"
 
@@ -15,11 +16,15 @@ using amg::flightwall::Application;
 using amg::flightwall::ClassicScene;
 using amg::flightwall::Color;
 using amg::flightwall::FrameBufferDisplay;
+using amg::flightwall::FrameContext;
+using amg::flightwall::HardwareSmokeScene;
 using amg::flightwall::Mode;
 using amg::flightwall::OperationStatus;
 using amg::flightwall::OperationsScene;
 using amg::flightwall::Renderer;
+using amg::flightwall::SceneManager;
 using amg::flightwall::ServiceState;
+using amg::flightwall::SmokeCheckState;
 
 void writePpm(const FrameBufferDisplay& display, const std::filesystem::path& path) {
   std::ofstream output(path, std::ios::binary);
@@ -71,6 +76,18 @@ int main(int argc, char** argv) {
     Application application(renderer, classic, operations);
     saveFrame(application, display, Mode::classic, 1'000, output_directory / "classic.ppm");
     saveFrame(application, display, Mode::operations, 2'000, output_directory / "operations.ppm");
+
+    HardwareSmokeScene hardware_smoke(
+        {0, SmokeCheckState::pending, SmokeCheckState::pending, SmokeCheckState::pending,
+         SmokeCheckState::pending});
+    SceneManager smoke_scenes;
+    smoke_scenes.activate(hardware_smoke);
+    FrameContext smoke_context{renderer, 3'000, 0};
+    smoke_scenes.render(smoke_context);
+    renderer.present();
+    const std::filesystem::path smoke_path = output_directory / "hardware-smoke.ppm";
+    writePpm(display, smoke_path);
+    std::cout << "wrote " << smoke_path << " (" << display.litPixelCount() << " lit pixels)\n";
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "simulator error: " << error.what() << '\n';

@@ -11,6 +11,7 @@
 #include "amg/flightwall/configuration.hpp"
 #include "amg/flightwall/diagnostics.hpp"
 #include "amg/flightwall/display.hpp"
+#include "amg/flightwall/hardware_smoke_scene.hpp"
 #include "amg/flightwall/mode.hpp"
 #include "amg/flightwall/plugin.hpp"
 #include "amg/flightwall/renderer.hpp"
@@ -175,6 +176,71 @@ void testApplicationRendersModes() {
   CHECK(display.presentCount() == 2);
   CHECK(display.litPixelCount() > 0);
   CHECK(display.litPixelCount() != classic_pixels);
+}
+
+void testHardwareSmokeSceneCommunicatesVerifiedProgress() {
+  FrameBufferDisplay display(128, 64);
+  Renderer renderer(display);
+  HardwareSmokeScene scene({23, SmokeCheckState::passed, SmokeCheckState::passed,
+                            SmokeCheckState::running, SmokeCheckState::passed});
+  SceneManager manager;
+  FrameContext context{renderer, 1'000, 0};
+
+  manager.activate(scene);
+  manager.render(context);
+
+  std::size_t green_pixels = 0;
+  std::size_t amber_pixels = 0;
+  std::size_t red_pixels = 0;
+  for (const Color pixel : display.pixels()) {
+    green_pixels += pixel == colors::green ? 1 : 0;
+    amber_pixels += pixel == colors::amber ? 1 : 0;
+    red_pixels += pixel == colors::red ? 1 : 0;
+  }
+
+  CHECK(scene.id() == "hardware-smoke");
+  CHECK(display.litPixelCount() > 500);
+  CHECK(green_pixels > 0);
+  CHECK(amber_pixels > 0);
+  CHECK(red_pixels == 0);
+
+  context.monotonic_ms = 1'500;
+  manager.render(context);
+  amber_pixels = 0;
+  for (const Color pixel : display.pixels()) {
+    amber_pixels += pixel == colors::amber ? 1 : 0;
+  }
+  CHECK(amber_pixels == 0);
+}
+
+std::uint64_t framebufferHash(const FrameBufferDisplay& display) {
+  constexpr std::uint64_t offset_basis = 14'695'981'039'346'656'037ULL;
+  constexpr std::uint64_t prime = 1'099'511'628'211ULL;
+  std::uint64_t hash = offset_basis;
+  for (const Color pixel : display.pixels()) {
+    for (const std::uint8_t channel : {pixel.red, pixel.green, pixel.blue}) {
+      hash ^= channel;
+      hash *= prime;
+    }
+  }
+  return hash;
+}
+
+void testHardwareSmokeSceneFramebufferRegression() {
+  FrameBufferDisplay display(128, 64);
+  Renderer renderer(display);
+  HardwareSmokeScene scene;
+  SceneManager manager;
+  FrameContext context{renderer, 1'000, 0};
+
+  manager.activate(scene);
+  manager.render(context);
+  CHECK(framebufferHash(display) == 12'401'996'579'662'572'810ULL);
+
+  scene.setProgress({0, SmokeCheckState::failed, SmokeCheckState::failed,
+                     SmokeCheckState::failed, SmokeCheckState::failed});
+  manager.render(context);
+  CHECK(framebufferHash(display) == 5'436'806'316'733'823'986ULL);
 }
 
 void testHdWf2MiniProfile() {
@@ -471,6 +537,10 @@ int main() {
     run("trigger priority", testTriggerPriority);
     run("plugin registration", testPluginRegistration);
     run("application renders modes", testApplicationRendersModes);
+    run("hardware smoke scene communicates verified progress",
+        testHardwareSmokeSceneCommunicatesVerifiedProgress);
+    run("hardware smoke scene framebuffer regression",
+        testHardwareSmokeSceneFramebufferRegression);
     run("HD-WF2 Mini profile", testHdWf2MiniProfile);
     run("default configuration is valid", testDefaultConfigurationIsValid);
     run("configuration rejects unsupported schema", testConfigurationRejectsUnsupportedSchema);
