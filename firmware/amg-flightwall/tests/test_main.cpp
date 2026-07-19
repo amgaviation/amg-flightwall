@@ -7,15 +7,26 @@
 #include <string>
 #include <string_view>
 
+#include "amg/flightwall/amg_mission_board_scene.hpp"
+#include "amg/flightwall/amg_ops_scene.hpp"
 #include "amg/flightwall/application.hpp"
+#include "amg/flightwall/clock_scene.hpp"
 #include "amg/flightwall/configuration.hpp"
+#include "amg/flightwall/countdown_scene.hpp"
+#include "amg/flightwall/data_models.hpp"
 #include "amg/flightwall/diagnostics.hpp"
 #include "amg/flightwall/display.hpp"
+#include "amg/flightwall/flight_radar_scene.hpp"
 #include "amg/flightwall/hardware_smoke_scene.hpp"
+#include "amg/flightwall/message_scene.hpp"
+#include "amg/flightwall/metar_scene.hpp"
 #include "amg/flightwall/mode.hpp"
+#include "amg/flightwall/notification_scene.hpp"
 #include "amg/flightwall/plugin.hpp"
 #include "amg/flightwall/renderer.hpp"
 #include "amg/flightwall/scene.hpp"
+#include "amg/flightwall/scene_rotator.hpp"
+#include "amg/flightwall/scene_support.hpp"
 #include "amg/flightwall/scenes.hpp"
 #include "amg/flightwall/target_profile.hpp"
 #include "amg/flightwall/wifi_supervisor.hpp"
@@ -526,6 +537,405 @@ void testDiagnosticsRejectInconsistentSeverityAndCode() {
         HealthCode::not_initialized);
 }
 
+std::size_t countColor(const FrameBufferDisplay& display, const Color color) {
+  std::size_t count = 0;
+  for (const Color pixel : display.pixels()) {
+    count += pixel == color ? 1 : 0;
+  }
+  return count;
+}
+
+std::uint64_t renderSceneHash(Scene& scene, const std::uint64_t now_ms) {
+  FrameBufferDisplay display(128, 64);
+  Renderer renderer(display);
+  FrameContext context{renderer, now_ms, 0};
+  scene.render(context);
+  return framebufferHash(display);
+}
+
+FlightSnapshot flightFixture() {
+  FlightSnapshot snapshot;
+  snapshot.contacts = {
+      {"N721AM", 26.15, -80.25, 12'000, 286, 90, 4.2, true},
+      {"DAL1842", 26.40, -80.40, 8'400, 242, 180, 12.9, false},
+      {"EJA550", 25.90, -80.00, 19'600, 355, 45, 18.3, false},
+  };
+  snapshot.fetched_at_ms = 1'000;
+  snapshot.valid = true;
+  return snapshot;
+}
+
+MetarSnapshot metarFixture() {
+  MetarSnapshot snapshot;
+  snapshot.station = "KTEB";
+  snapshot.raw = "KTEB 191751Z 24012KT 10SM FEW060 29/18 A2992";
+  snapshot.flight_category = "VFR";
+  snapshot.wind = "24012KT";
+  snapshot.visibility = "10SM";
+  snapshot.temp_c = 29;
+  snapshot.dewpoint_c = 18;
+  snapshot.fetched_at_ms = 1'000;
+  snapshot.valid = true;
+  return snapshot;
+}
+
+AmgMetricsSnapshot amgFixture() {
+  AmgMetricsSnapshot snapshot;
+  snapshot.new_request_count = 3;
+  snapshot.latest_requests = {{"KTEB-KPBI", "J S", 42}};
+  snapshot.active_mission_count = 2;
+  snapshot.missions = {{"N123AM KTEB-KOPF", "enroute", 95},
+                       {"N88AM KOPF-KTEB", "scheduled", -1}};
+  snapshot.recent_submissions = {{"contact", "M R", 3}};
+  snapshot.submissions_cursor = "cursor-1";
+  snapshot.revenue_today_cents = 452'000;
+  snapshot.revenue_mtd_cents = 1'240'000;
+  snapshot.currency = "usd";
+  snapshot.site_state = "ok";
+  snapshot.fetched_at_ms = 1'000;
+  snapshot.valid = true;
+  return snapshot;
+}
+
+void testSceneRotatorRotatesAndSkipsDisabled() {
+  CountingScene first("first");
+  CountingScene second("second");
+  CountingScene third("third");
+  SceneRotator rotator;
+  rotator.setPlaylist({{&first, true, 100}, {&second, false, 100}, {&third, true, 200}});
+  FrameBufferDisplay display(8, 8);
+  Renderer renderer(display);
+  FrameContext context{renderer, 0, 0};
+
+  CHECK(rotator.tick(context) == &first);
+  CHECK(first.enters == 1);
+  CHECK(rotator.activeSceneId() == "first");
+  context.monotonic_ms = 99;
+  CHECK(rotator.tick(context) == &first);
+  context.monotonic_ms = 100;
+  CHECK(rotator.tick(context) == &third);
+  CHECK(first.exits == 1);
+  CHECK(third.enters == 1);
+  context.monotonic_ms = 299;
+  CHECK(rotator.tick(context) == &third);
+  context.monotonic_ms = 300;
+  CHECK(rotator.tick(context) == &first);
+  CHECK(second.renders == 0);
+  CHECK(second.enters == 0);
+}
+
+void testSceneRotatorSingleSlotStays() {
+  CountingScene only("only");
+  SceneRotator rotator;
+  rotator.setPlaylist({{&only, true, 50}});
+  FrameBufferDisplay display(8, 8);
+  Renderer renderer(display);
+  FrameContext context{renderer, 0, 0};
+
+  CHECK(rotator.tick(context) == &only);
+  context.monotonic_ms = 1'000;
+  CHECK(rotator.tick(context) == &only);
+  context.monotonic_ms = 5'000;
+  CHECK(rotator.tick(context) == &only);
+  CHECK(only.enters == 1);
+  CHECK(only.exits == 0);
+  CHECK(only.renders == 3);
+}
+
+void testSceneRotatorOverlayPreemptionAndExpiry() {
+  CountingScene base("base");
+  CountingScene next("next");
+  CountingScene note("note");
+  CountingScene alert("alert");
+  SceneRotator rotator;
+  rotator.setPlaylist({{&base, true, 1'000}, {&next, true, 500}});
+  FrameBufferDisplay display(8, 8);
+  Renderer renderer(display);
+  FrameContext context{renderer, 0, 0};
+
+  CHECK(rotator.tick(context) == &base);
+  CHECK(rotator.pushOverlay(note, 200, 1));
+  context.monotonic_ms = 10;
+  CHECK(rotator.tick(context) == &note);
+  CHECK(base.exits == 1);
+  CHECK(rotator.pushOverlay(alert, 100, 5));
+  context.monotonic_ms = 20;
+  CHECK(rotator.tick(context) == &alert);  // higher priority preempts
+  CHECK(note.exits == 1);
+  context.monotonic_ms = 119;
+  CHECK(rotator.tick(context) == &alert);
+  context.monotonic_ms = 120;
+  CHECK(rotator.tick(context) == &note);  // queued overlay restarts fresh
+  context.monotonic_ms = 319;
+  CHECK(rotator.tick(context) == &note);
+  context.monotonic_ms = 320;
+  CHECK(rotator.tick(context) == &base);  // playlist resumes, slot timer reset
+  CHECK(rotator.overlayCount() == 0);
+  CHECK(base.enters == 2);
+  CHECK(note.enters == 2);
+  CHECK(alert.enters == 1);
+  context.monotonic_ms = 1'319;
+  CHECK(rotator.tick(context) == &base);  // full duration after the overlay
+  context.monotonic_ms = 1'320;
+  CHECK(rotator.tick(context) == &next);
+}
+
+void testSceneRotatorActivateNow() {
+  CountingScene first("first");
+  CountingScene second("second");
+  CountingScene third("third");
+  SceneRotator rotator;
+  rotator.setPlaylist({{&first, true, 100}, {&second, true, 100}, {&third, false, 100}});
+  FrameBufferDisplay display(8, 8);
+  Renderer renderer(display);
+  FrameContext context{renderer, 0, 0};
+
+  CHECK(rotator.tick(context) == &first);
+  CHECK(rotator.activateNow("third", 300));  // disabled slots can be forced
+  context.monotonic_ms = 10;
+  CHECK(rotator.tick(context) == &third);
+  context.monotonic_ms = 309;
+  CHECK(rotator.tick(context) == &third);
+  context.monotonic_ms = 310;
+  CHECK(rotator.tick(context) == &first);  // advances past the disabled slot
+  CHECK(rotator.activateNow("unknown", 100) == false);
+}
+
+void testSceneRotatorOverlayQueueIsBounded() {
+  CountingScene base("base");
+  CountingScene overlay("overlay");
+  SceneRotator rotator;
+  rotator.setPlaylist({{&base, true, 1'000}});
+  for (std::size_t index = 0; index < SceneRotator::max_overlays; ++index) {
+    CHECK(rotator.pushOverlay(overlay, 1'000, 0));
+  }
+  CHECK(rotator.pushOverlay(overlay, 1'000, 200) == false);
+  CHECK(rotator.overlayCount() == SceneRotator::max_overlays);
+}
+
+void testClockSceneGoldenAndStale() {
+  FrameBufferDisplay display(128, 64);
+  Renderer renderer(display);
+  ClockScene scene;
+  scene.setClock({7, 45, 30, 7, 19, 6, true});
+  FrameContext context{renderer, 1'000, 0};
+  scene.render(context);
+  CHECK(display.litPixelCount() > 0);
+  const std::uint64_t valid_hash = framebufferHash(display);
+  CHECK(valid_hash == 5'447'952'058'334'295'885ULL);
+
+  ClockScene fresh;
+  ClockScene invalid;
+  invalid.setClock({99, 99, 99, 99, 99, 99, false});
+  const std::uint64_t stale_marker = renderSceneHash(fresh, 1'000);
+  CHECK(renderSceneHash(invalid, 1'000) == stale_marker);
+  CHECK(stale_marker != valid_hash);
+}
+
+void testFlightRadarSceneContactsAndStale() {
+  FrameBufferDisplay display(128, 64);
+  Renderer renderer(display);
+  FlightRadarScene scene;
+  scene.setOwnPosition(26.07, -80.15);
+  scene.setRangeNm(30);
+  scene.setSnapshot(flightFixture());
+  FrameContext context{renderer, 1'000, 0};
+  scene.render(context);
+  CHECK(display.litPixelCount() > 0);
+  CHECK(countColor(display, colors::amber) > 0);  // watchlisted contact
+  CHECK(countColor(display, colors::cyan) > 0);   // other contacts
+  const std::uint64_t valid_hash = framebufferHash(display);
+
+  FlightRadarScene fresh;
+  FlightRadarScene invalid;
+  invalid.setOwnPosition(26.07, -80.15);
+  FlightSnapshot garbage = flightFixture();
+  garbage.valid = false;
+  invalid.setSnapshot(garbage);
+  const std::uint64_t stale_marker = renderSceneHash(fresh, 1'000);
+  CHECK(renderSceneHash(invalid, 1'000) == stale_marker);
+  CHECK(stale_marker != valid_hash);
+
+  FlightRadarScene empty;
+  FlightSnapshot no_traffic;
+  no_traffic.valid = true;
+  empty.setSnapshot(no_traffic);
+  CHECK(renderSceneHash(empty, 1'000) != stale_marker);
+}
+
+void testMetarSceneCategoryColorsAndStale() {
+  FrameBufferDisplay display(128, 64);
+  Renderer renderer(display);
+  MetarScene scene;
+  scene.setSnapshot(metarFixture());
+  FrameContext context{renderer, 1'000, 0};
+  scene.render(context);
+  CHECK(display.litPixelCount() > 0);
+  CHECK(countColor(display, colors::green) > 0);  // VFR category
+
+  MetarSnapshot lifr = metarFixture();
+  lifr.flight_category = "LIFR";
+  scene.setSnapshot(lifr);
+  scene.render(context);
+  CHECK(countColor(display, scene_support::magenta) > 0);
+  CHECK(countColor(display, colors::green) == 0);
+
+  MetarScene fresh;
+  MetarScene invalid;
+  MetarSnapshot garbage = metarFixture();
+  garbage.station.clear();
+  garbage.flight_category.clear();
+  garbage.valid = false;
+  invalid.setSnapshot(garbage);
+  const std::uint64_t stale_marker = renderSceneHash(fresh, 1'000);
+  CHECK(renderSceneHash(invalid, 1'000) == stale_marker);
+}
+
+void testAmgOpsSceneCountersAndStale() {
+  FrameBufferDisplay display(128, 64);
+  Renderer renderer(display);
+  AmgOpsScene scene;
+  scene.setSnapshot(amgFixture());
+  FrameContext context{renderer, 1'000, 0};
+  scene.render(context);
+  CHECK(display.litPixelCount() > 0);
+  CHECK(countColor(display, colors::amber) > 0);  // NEW REQ 3 highlighted
+
+  AmgMetricsSnapshot quiet = amgFixture();
+  quiet.new_request_count = 0;
+  scene.setSnapshot(quiet);
+  scene.render(context);
+  CHECK(countColor(display, colors::amber) == 0);
+
+  AmgOpsScene fresh;
+  AmgOpsScene invalid;
+  AmgMetricsSnapshot garbage = amgFixture();
+  garbage.site_state.clear();
+  garbage.valid = false;
+  invalid.setSnapshot(garbage);
+  const std::uint64_t stale_marker = renderSceneHash(fresh, 1'000);
+  CHECK(renderSceneHash(invalid, 1'000) == stale_marker);
+}
+
+void testAmgMissionBoardSceneRowsAndStale() {
+  FrameBufferDisplay display(128, 64);
+  Renderer renderer(display);
+  AmgMissionBoardScene scene;
+  scene.setSnapshot(amgFixture());
+  FrameContext context{renderer, 1'000, 0};
+  scene.render(context);
+  CHECK(display.litPixelCount() > 0);
+  CHECK(countColor(display, colors::green) > 0);  // enroute chip
+  CHECK(countColor(display, colors::cyan) > 0);   // scheduled chip
+
+  AmgMissionBoardScene empty;
+  AmgMetricsSnapshot no_missions = amgFixture();
+  no_missions.missions.clear();
+  empty.setSnapshot(no_missions);
+  CHECK(renderSceneHash(empty, 1'000) != 0);
+
+  AmgMissionBoardScene fresh;
+  AmgMissionBoardScene invalid;
+  AmgMetricsSnapshot garbage = amgFixture();
+  garbage.valid = false;
+  invalid.setSnapshot(garbage);
+  const std::uint64_t stale_marker = renderSceneHash(fresh, 1'000);
+  CHECK(renderSceneHash(invalid, 1'000) == stale_marker);
+}
+
+void testMessageSceneScrollAndStale() {
+  MessageScene scene;
+  scene.setMessage({"CHARTER READY", colors::amber, 0, true});
+  // Cycle: 13 chars * 12 px + 32 px gap = 188 px at 20 px/s -> 9400 ms period.
+  const std::uint64_t scroll_start = renderSceneHash(scene, 1'000);
+  CHECK(scroll_start == renderSceneHash(scene, 1'000 + 9'400));
+  CHECK(scroll_start != renderSceneHash(scene, 1'000 + 4'700));
+
+  MessageScene wrapped;
+  wrapped.setMessage({"CREW BRIEF AT HANGAR TWO AT EIGHTEEN HUNDRED", colors::white, 0, false});
+  FrameBufferDisplay display(128, 64);
+  Renderer renderer(display);
+  FrameContext context{renderer, 1'000, 0};
+  wrapped.render(context);
+  CHECK(display.litPixelCount() > 0);
+
+  MessageScene fresh;
+  MessageScene empty;
+  empty.setMessage({"", colors::white, 0, true});
+  const std::uint64_t stale_marker = renderSceneHash(fresh, 1'000);
+  CHECK(renderSceneHash(empty, 1'000) == stale_marker);
+  CHECK(stale_marker != 0);
+}
+
+void testCountdownSceneTicksAndStale() {
+  FrameBufferDisplay display(128, 64);
+  Renderer renderer(display);
+  CountdownScene scene;
+  scene.setCountdown({"NEXT DEP", 90'061});  // 1 day 01:01:01
+  FrameContext context{renderer, 5'000, 0};
+  scene.render(context);
+  CHECK(display.litPixelCount() > 0);
+  const std::uint64_t first_hash = framebufferHash(display);
+  CHECK(first_hash == 17'494'560'472'044'079'601ULL);
+
+  context.monotonic_ms = 6'000;  // one second later the display ticks down
+  scene.render(context);
+  CHECK(framebufferHash(display) != first_hash);
+
+  CountdownScene fresh;
+  CountdownScene invalid;
+  invalid.setCountdown({"", -5});
+  const std::uint64_t stale_marker = renderSceneHash(fresh, 5'000);
+  CHECK(renderSceneHash(invalid, 5'000) == stale_marker);
+  CHECK(stale_marker != first_hash);
+}
+
+void testNotificationSceneBannerAndFallback() {
+  FrameBufferDisplay display(128, 64);
+  Renderer renderer(display);
+  NotificationScene scene;
+  scene.setNotification({"ALERT", "NEW CHARTER REQUEST FROM WEB", colors::red, 200, 15'000});
+  FrameContext context{renderer, 1'000, 0};
+  scene.render(context);
+  CHECK(display.litPixelCount() > 0);
+  CHECK(display.pixel(0, 0) == colors::red);
+  CHECK(display.pixel(127, 63) == colors::red);
+  // Body cycle: 28 chars * 6 px + 24 px gap = 192 px at 20 px/s -> 9600 ms.
+  const std::uint64_t first_hash = framebufferHash(display);
+  CHECK(renderSceneHash(scene, 1'000 + 9'600) == first_hash);
+  CHECK(renderSceneHash(scene, 1'000 + 4'800) != first_hash);
+
+  NotificationScene fallback;  // no payload: default border + placeholder title
+  FrameBufferDisplay fallback_display(128, 64);
+  Renderer fallback_renderer(fallback_display);
+  FrameContext fallback_context{fallback_renderer, 1'000, 0};
+  fallback.render(fallback_context);
+  CHECK(fallback_display.litPixelCount() > 0);
+  CHECK(fallback_display.pixel(0, 0) == colors::amg_blue);
+}
+
+void testNotificationOverlayDrivesRotator() {
+  FrameBufferDisplay display(128, 64);
+  Renderer renderer(display);
+  ClockScene clock;
+  clock.setClock({7, 45, 30, 7, 19, 6, true});
+  NotificationScene notification;
+  notification.setNotification({"ALERT", "NEW REQUEST", colors::red, 200, 5'000});
+  SceneRotator rotator;
+  rotator.setPlaylist({{&clock, true, 10'000}});
+  FrameContext context{renderer, 0, 0};
+
+  CHECK(rotator.tick(context) == &clock);
+  CHECK(rotator.pushOverlay(notification, 5'000, 200));
+  context.monotonic_ms = 100;
+  CHECK(rotator.tick(context) == &notification);
+  CHECK(display.pixel(0, 0) == colors::red);
+  context.monotonic_ms = 5'100;
+  CHECK(rotator.tick(context) == &clock);
+  CHECK(display.pixel(0, 0) == colors::black);
+  CHECK(rotator.overlayCount() == 0);
+}
+
 }  // namespace
 
 int main() {
@@ -566,6 +976,21 @@ int main() {
         testDiagnosticsRejectTimestampRegressionAndFutureReports);
     run("diagnostics reject inconsistent severity and code",
         testDiagnosticsRejectInconsistentSeverityAndCode);
+    run("scene rotator rotates and skips disabled", testSceneRotatorRotatesAndSkipsDisabled);
+    run("scene rotator single slot stays", testSceneRotatorSingleSlotStays);
+    run("scene rotator overlay preemption and expiry",
+        testSceneRotatorOverlayPreemptionAndExpiry);
+    run("scene rotator activate now", testSceneRotatorActivateNow);
+    run("scene rotator overlay queue is bounded", testSceneRotatorOverlayQueueIsBounded);
+    run("clock scene golden and stale", testClockSceneGoldenAndStale);
+    run("flight radar scene contacts and stale", testFlightRadarSceneContactsAndStale);
+    run("metar scene category colors and stale", testMetarSceneCategoryColorsAndStale);
+    run("amg ops scene counters and stale", testAmgOpsSceneCountersAndStale);
+    run("amg mission board scene rows and stale", testAmgMissionBoardSceneRowsAndStale);
+    run("message scene scroll and stale", testMessageSceneScrollAndStale);
+    run("countdown scene ticks and stale", testCountdownSceneTicksAndStale);
+    run("notification scene banner and fallback", testNotificationSceneBannerAndFallback);
+    run("notification overlay drives rotator", testNotificationOverlayDrivesRotator);
     std::cout << tests_run << " tests passed\n";
     return 0;
   } catch (const std::exception& error) {

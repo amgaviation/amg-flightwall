@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AMG FlightWall</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23176CFF'/%3E%3Cpath d='M3 11 8 4l5 7-5-2z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div id="shell">
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">FW</div>
+      <div class="brand-text">
+        <span class="brand-name">FLIGHTWALL</span>
+        <span class="brand-sub">AMG AVIATION GROUP</span>
+      </div>
+    </div>
+    <nav id="nav"></nav>
+    <div id="conn-pill" class="conn-pill conn-off">OFFLINE</div>
+  </aside>
+  <main id="main">
+    <div id="setup-banner" class="setup-banner hidden">
+      SETUP MODE — device is broadcasting the <b>FlightWall-Setup</b> access point.
+      Configure Wi-Fi on the <a href="#/setup">Setup page</a>.
+    </div>
+    <div id="page"></div>
+  </main>
+</div>
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>
