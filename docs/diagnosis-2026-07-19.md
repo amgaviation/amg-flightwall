@@ -92,3 +92,27 @@ conditions above, which were introduced during teardown and handling.
 - If X2 also shows nothing with verified power and seating, the remaining
   suspects are the ribbon cable itself (substitute a known-good straight
   16-pin IDC cable) and panel electronics.
+
+## Resolution — 2026-07-19 (late session, hardware confirmed on bench)
+
+**Verified Current Fact:** Two independent faults were present.
+(1) A failed contact in the panel's 4-pin power plug caused the total-darkness
+era; the owner reseated the plug and the panel immediately lit under the raw
+X1 diagnostic — as a static green field with one white column and no pattern
+changes, with the RUN-LED heartbeat blinking.
+(2) That residual symptom (control lines alive, color data absent) isolated to
+the HD-WF2's 75EX1 color-data buffer path. Moving the ribbon to 75EX2 and
+flashing the X2-pin diagnostic produced the full pattern cycle, photo-verified:
+clean 8x8 checkerboard and correctly placed, unmixed row-address bands.
+
+**Verified Current Fact:** The bands pattern renders without the two-color
+mixing that a floating E line would produce, so on this HD-WF2 V7.2.0-2 the
+75EX2 port's E line works with GPIO21 — contrary to the community pin map's
+"unknown/unusable" note for X2 with 1/32-scan panels.
+
+**Conclusion:** Panel, ribbon, power path, and controller (except the X1
+color-buffer section) are healthy. 75EX2 is a fully functional permanent home
+for the panel. Production custom firmware should use the X2 pin profile:
+R1/R2 4/5, G1/G2 8/9, B1/B2 12/13, A/B/C/D/E 39/38/37/36/21,
+LAT/OE/CLK 33/35/34. The factory application drives X1 pins and will not
+display unless binary-patched for X2 or the X1 buffer is repaired.

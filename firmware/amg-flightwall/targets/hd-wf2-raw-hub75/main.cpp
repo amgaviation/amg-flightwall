@@ -28,6 +28,7 @@ constexpr gpio_num_t kRowE = GPIO_NUM_21;
 constexpr gpio_num_t kLatch = GPIO_NUM_33;
 constexpr gpio_num_t kOutputEnable = GPIO_NUM_35;
 constexpr gpio_num_t kClock = GPIO_NUM_34;
+constexpr gpio_num_t kRunLed = GPIO_NUM_40;
 
 constexpr std::array<gpio_num_t, 14> kOutputPins{
     kOutputEnable, kR1,   kG1,   kB1,   kR2,   kG2,  kB2,
@@ -312,6 +313,13 @@ class RawHub75Diagnostic final {
     }
 
     initializeFm6124e();
+
+    if (gpio_reset_pin(kRunLed) == ESP_OK &&
+        gpio_set_direction(kRunLed, GPIO_MODE_OUTPUT) == ESP_OK) {
+      gpio_set_level(kRunLed, 1);
+      run_led_ready_ = true;
+    }
+
     pattern_started_ms_ = millis();
     last_heartbeat_ms_ = pattern_started_ms_;
     renderPattern(framebuffer_, active_pattern_);
@@ -344,6 +352,12 @@ class RawHub75Diagnostic final {
       announcePattern(active_pattern_);
     }
 
+    if (run_led_ready_ && now - last_led_toggle_ms_ >= 500U) {
+      run_led_on_ = !run_led_on_;
+      gpio_set_level(kRunLed, run_led_on_ ? 1 : 0);
+      last_led_toggle_ms_ = now;
+    }
+
     if (now - last_heartbeat_ms_ >= 5000U) {
       Serial.printf("RAW HUB75: alive, frames=%lu\n",
                     static_cast<unsigned long>(completed_frames_));
@@ -360,6 +374,9 @@ class RawHub75Diagnostic final {
   std::uint32_t pattern_started_ms_{0};
   std::uint32_t last_heartbeat_ms_{0};
   std::uint32_t completed_frames_{0};
+  std::uint32_t last_led_toggle_ms_{0};
+  bool run_led_ready_{false};
+  bool run_led_on_{true};
   bool initialized_{false};
 };
 
