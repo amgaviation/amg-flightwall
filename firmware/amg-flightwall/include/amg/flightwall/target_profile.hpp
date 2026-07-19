@@ -113,4 +113,25 @@ static_assert(hdWf2MiniProfile().partition_map.end_offset() ==
                   hdWf2MiniProfile().flash_bytes,
               "HD-WF2 partition map must fill the 8 MB flash");
 
+// 75EX2 variant. The production profile after the 75EX1 color-buffer failure
+// (docs/diagnosis-2026-07-19.md): RGB moves to the X2 pins; row/E/latch/OE/
+// clock are shared with X1. The E line on X2 was bench-verified working on
+// board revision V7.2.0-2.
+[[nodiscard]] constexpr TargetProfile hdWf2MiniX2Profile() noexcept {
+  TargetProfile profile = hdWf2MiniProfile();
+  profile.hub75 = Hub75Pins{4, 8, 12, 5, 9, 13, 39, 38, 37, 36, 21, 33, 35, 34};
+  return profile;
+}
+
+static_assert(hdWf2MiniX2Profile().pins_are_unique(),
+              "HD-WF2 X2 HUB75 pins must be unique");
+static_assert(!hdWf2MiniX2Profile().uses_gpio(19),
+              "GPIO19 is reserved for native USB D-");
+static_assert(!hdWf2MiniX2Profile().uses_gpio(20),
+              "GPIO20 is reserved for native USB D+");
+static_assert(!hdWf2MiniX2Profile().uses_gpio(2) && !hdWf2MiniX2Profile().uses_gpio(6) &&
+                  !hdWf2MiniX2Profile().uses_gpio(10) && !hdWf2MiniX2Profile().uses_gpio(3) &&
+                  !hdWf2MiniX2Profile().uses_gpio(7) && !hdWf2MiniX2Profile().uses_gpio(11),
+              "X2 profile must not drive the failed X1 color-data pins");
+
 }  // namespace amg::flightwall
