@@ -55,7 +55,15 @@ Diagnostics       Local web config   OTA/recovery supervisor
 
 **Verified Current Fact:** The host-buildable C++17 slice implements `Display`,
 `Renderer`, `Scene`, `SceneManager`, `ModeController`, `PluginRegistry`, and
-`Application` interfaces without network, storage, or hardware dependencies.
+`Application` interfaces. It also implements `DeviceConfiguration` validation,
+a platform-neutral `WifiSupervisor`, and a fixed-size `HealthRegistry` without
+network-adapter, credential-store, persistent-storage, or hardware dependencies.
+
+**Verified Current Fact:** `HardwareSmokeScene` renders typed host-test, build,
+factory-backup-hash, hardware-test, and source-gate states on the portable
+display interface. Its running state pulses from the supplied monotonic clock.
+The generic composition defaults external evidence to `WAIT`; the embedded
+composition asserts only its active target build and render loop as `RUN`.
 
 **Verified Current Fact:** The simulator uses an in-memory RGB framebuffer and
 exports PPM images. The Classic and Operations scenes contain synthetic data
@@ -106,6 +114,22 @@ theme names require trademark/legal review before distribution.
 
 ## Configuration and secrets
 
+**Verified Current Fact:** `DeviceConfiguration` is schema-versioned and
+validates startup mode, brightness, a fixed-capacity airport filter, and an
+opaque numeric Wi-Fi profile key/revision. It has no password, token, credential,
+or dynamically allocated string field. `HealthRegistry` accepts only typed
+subsystem, severity, code, and timestamp values, so its diagnostic snapshots
+cannot carry free-text secrets.
+
+**Verified Current Fact:** `WifiSupervisor` emits only a request to connect with
+the already configured profile reference or to disconnect. Transient failures
+use deterministic profile-distributed jitter, bounded exponential backoff, and
+an eight-attempt ceiling. Authentication rejection and retry exhaustion stop
+retries until the opaque profile key/revision changes. Connection observations
+must echo the active profile and attempt generation; stale observations are
+ignored. No Wi-Fi adapter, credential storage, or actual network connection is
+implemented.
+
 **Recommendation:** Store user configuration as a versioned document with
 defaults, validation, migration, atomic commit, and last-known-good recovery.
 Secrets use a distinct storage interface and are redacted from logs, backups,
@@ -113,6 +137,12 @@ diagnostics, and browser responses. Browser configuration requires authenticated
 sessions, CSRF protection, secure transport, rate limits, and explicit reset.
 
 ## Reliability model
+
+**Verified Current Fact:** The current portable Wi-Fi policy caps retry delay at
+60 seconds, bounds attempts at eight, and saturates timestamp arithmetic rather
+than overflowing. Health reports reject timestamp regression and timestamps
+ahead of their observation time, as well as severity/code contradictions;
+snapshots mark expired reports or clock rollback with typed status codes.
 
 **Recommendation:** The application uses bounded queues, timeouts, backoff with
 jitter, stale-data indicators, watchdog heartbeats, structured error codes, and

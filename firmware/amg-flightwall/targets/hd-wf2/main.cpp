@@ -1,8 +1,7 @@
 #include <Arduino.h>
 
-#include "amg/flightwall/application.hpp"
+#include "amg/flightwall/hardware_smoke_scene.hpp"
 #include "amg/flightwall/renderer.hpp"
-#include "amg/flightwall/scenes.hpp"
 #include "hd_wf2_display.hpp"
 
 namespace {
@@ -18,25 +17,26 @@ class FlightWallRuntime final {
       return;
     }
 
-    classic_scene_.setContacts({{"AMG001", 64, 32, 12'000, 286, true}});
-    operations_scene_.setStatuses({{"SYSTEM", ServiceState::healthy, 100}});
-    application_.modes().setRequestedMode(Mode::classic);
+    scenes_.activate(smoke_scene_);
     display_ready_ = true;
-    Serial.println("AMG FlightWall: build-only HD-WF2 target initialized");
+    Serial.println("AMG FlightWall: hardware smoke screen initialized");
   }
 
   void loop(const std::uint64_t monotonic_ms) noexcept {
     if (display_ready_) {
-      application_.tick(monotonic_ms);
+      FrameContext context{renderer_, monotonic_ms, frame_number_++};
+      scenes_.render(context);
+      renderer_.present();
     }
   }
 
  private:
   HdWf2Display display_;
   Renderer renderer_{display_};
-  ClassicScene classic_scene_;
-  OperationsScene operations_scene_;
-  Application application_{renderer_, classic_scene_, operations_scene_};
+  HardwareSmokeScene smoke_scene_{{0, SmokeCheckState::running, SmokeCheckState::pending,
+                                    SmokeCheckState::running, SmokeCheckState::pending}};
+  SceneManager scenes_{};
+  std::uint64_t frame_number_{0};
   bool display_ready_{false};
 };
 

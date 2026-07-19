@@ -32,6 +32,7 @@ simulator-smoke: $(SIMULATOR_BIN)
 	$(SIMULATOR_BIN) $(ARTIFACT_DIR)
 	@test -s $(ARTIFACT_DIR)/classic.ppm
 	@test -s $(ARTIFACT_DIR)/operations.ppm
+	@test -s $(ARTIFACT_DIR)/hardware-smoke.ppm
 
 check: test simulator-smoke
 

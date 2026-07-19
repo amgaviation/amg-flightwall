@@ -44,12 +44,18 @@ jobs:
       - name: Install pinned PlatformIO
         run: python -m pip install -r tools/requirements-build.txt
 
-      - name: Build HD-WF2 target without uploading
-        run: ./scripts/build.sh hd-wf2
+      - name: Build HD-WF2 targets without uploading
+        run: |
+          ./scripts/build.sh hd-wf2
+          ./scripts/build.sh hd-wf2-raw-hub75
 
       - name: Verify device-write safety gate
         run: |
-          if pio run --project-dir firmware/amg-flightwall --environment hd_wf2_build_only --target upload --upload-port /dev/null; then
-            echo "safety gate unexpectedly allowed an upload target" >&2
-            exit 1
-          fi
+          for environment in hd_wf2_build_only hd_wf2_raw_hub75_diagnostic; do
+            for blocked_target in upload uploadfs program erase; do
+              if pio run --project-dir firmware/amg-flightwall --environment "$environment" --target "$blocked_target" --upload-port /dev/null; then
+                echo "safety gate unexpectedly allowed $environment $blocked_target" >&2
+                exit 1
+              fi
+            done
+          done

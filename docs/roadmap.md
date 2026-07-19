@@ -28,9 +28,11 @@ architecture review on an approved development device.
 
 **Current prototype evidence:** display port, framebuffer, renderer, scene
 manager, mode controller, plugin registry, Classic/Operations sample scenes,
-host tests, and generated simulator frames. Configuration persistence, logging,
-health reporting, target adapters, target measurements, and hardware review are
-not implemented.
+schema-versioned configuration validation, Wi-Fi supervision policy, typed
+health reporting, host tests, generated simulator frames, and an experimental
+compile-only HD-WF2 target adapter with a visible smoke-test scene. Configuration
+persistence, credential storage and provisioning, platform Wi-Fi integration,
+logging, target measurements, and hardware review are not implemented.
 
 ## Phase 3 — Classic Mode
 

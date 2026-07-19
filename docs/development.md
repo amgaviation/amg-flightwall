@@ -39,6 +39,10 @@ serial, USB, flash, or device operation at runtime because it only compiles.
 - Return typed errors; logs supplement errors but do not replace them.
 - Never log credentials, tokens, precise private locations, client records, or
   raw mission/crew data.
+- Keep credentials behind a secret-storage interface and reference them from
+  ordinary configuration only by opaque profile key and revision.
+- Keep health snapshots typed and bounded; diagnostic reports must not accept
+  arbitrary text or provider payloads.
 - Put provider-specific payloads in adapters and normalize before domain use.
 
 **Target-boundary exception:** Arduino requires the free `setup()` and `loop()`
