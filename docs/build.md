@@ -58,15 +58,18 @@ Before adding application code, the approved build must:
 ./scripts/check.sh
 ./scripts/build.sh simulator
 ./scripts/build.sh hd-wf2
+./scripts/build.sh hd-wf2-raw-hub75
 ```
 
 The scripts are non-interactive and safe to rerun. Host artifacts are written
 under `build/host/`; embedded build artifacts are written under PlatformIO's
 ignored `.pio/` directory.
 
-The `hd-wf2` command compiles only. Its PlatformIO safety gate rejects `upload`,
-`uploadfs`, `program`, and `erase` targets. The Espressif platform and HUB75
-driver are pinned, and the partition CSV mirrors the read-only factory
+Both HD-WF2 commands compile only. Their PlatformIO safety gate rejects
+`upload`, `uploadfs`, `program`, and `erase` targets. The `hd-wf2` target uses
+the pinned HUB75 DMA dependency; `hd-wf2-raw-hub75` builds the isolated Arduino
+and ESP-IDF GPIO diagnostic without the display library. Both use the pinned
+Espressif platform and the partition CSV that mirrors the read-only factory
 snapshot.
 
 **Verified Current Fact:** The current smoke-screen target compiles to 287,045
@@ -82,6 +85,6 @@ validated restoration procedure and isolated signing design.
 ## Flashing gate
 
 No generic flash command is documented. The factory controller is now backed
-up, but restoration has not been validated. Add packaging, signing, hardware
-activation, or flash commands only after a successful restoration test on a
-sacrificial or dedicated development unit.
+up, but full-image restoration has not been validated. Add packaging, signing,
+hardware activation, or flash commands only after a successful restoration
+test on a sacrificial or dedicated development unit.

@@ -78,16 +78,47 @@ implementation or rollback behavior.
 orientation, color order, HUB75 pin mapping, and refresh behavior remain
 unmeasured.
 
+**Verified Current Fact:** Both preserved factory application images contain
+the same HUB75 GPIO order: R1/G1/B1 `2/6/10`, R2/G2/B2 `3/7/11`, A/B/C/D/E
+`39/38/37/36/21`, and LAT/OE/CLK `33/35/34`. Factory app0 configures a
+64×64 physical module with chain length two, FM6126A-family initialization,
+an 8 MHz clock, latch blanking two, false clock phase, 60 Hz minimum refresh,
+eight-bit color depth, and startup brightness 160. Its MatrixPanel ABI contains
+a line-decoder field that the factory constructor does not explicitly
+initialize, so the exact decoder enum is not a verified factory setting.
+These facts were derived from the saved factory binaries; they do not prove
+electrical signal presence at the panel.
+
+**Verified Current Fact:** Each saved factory application contains the exact
+14-byte X1 GPIO array once at application offset `0x3129`, and the factory
+display-construction path copies those 14 values into the MatrixPanel
+configuration. No additional panel, buffer, or power-enable GPIO was found in
+that path. Independent HD-WF2 implementations also use only these 14 lines;
+see [WLED's pinned definition](https://github.com/wled/WLED/blob/a962116f54bc3b62db46013849f0bf5b3ebabb73/wled00/bus_manager.cpp#L870-L876)
+and the
+[MatrixPanel HD-WF2 bring-up record](https://github.com/mrcodetastic/ESP32-HUB75-MatrixPanel-DMA/issues/433).
+There is no public schematic for the inspected V7.2.0-2 board, so this does not
+replace an electrical measurement.
+
+**Verified Current Fact:** The saved factory app0 was restored and verified,
+then a library-free raw GPIO diagnostic independently drove the same pins and
+FM6124E control sequence. The raw diagnostic's execution was confirmed by
+serial heartbeats while the owner observed a completely blank panel. Factory
+application execution after the verified restore was not independently
+established. The raw artifact's exact post-flash readback matched SHA-256
+`732196319ebbfb488c7ecbe1ca0c32c1c44553ce506c9e6155782f3eddc20f66`.
+No panel-side voltage, current, or logic-level measurement has been made, so
+panel power, connector continuity, level shifting, and panel electronics
+remain unresolved.
+
 **Planning Assumption:** A 128×64 host profile is appropriate for Mini layout
 work. Orientation, color order, HUB75 mapping, and refresh behavior remain
 pending measurement.
 
-**Planning Assumption:** The build-only HD-WF2 adapter uses the pin order
-published by WLED at commit `a962116f54bc3b62db46013849f0bf5b3ebabb73`:
-R1/G1/B1 `2/6/10`, R2/G2/B2 `3/7/11`, A/B/C/D/E
-`39/38/37/36/21`, LAT/OE/CLK `33/35/34`. This profile compiles and agrees with
-the controller family, but it has not been electrically verified on this Mini.
-See [WLED's HD-WF2 definition](https://github.com/wled/WLED/blob/a962116f54bc3b62db46013849f0bf5b3ebabb73/wled00/bus_manager.cpp#L870-L876).
+**Recommendation:** Keep the factory-derived pin profile as the target baseline,
+but do not describe it as electrically verified until logic activity is
+measured at controller X1 and panel J1. It also agrees with
+[WLED's HD-WF2 definition](https://github.com/wled/WLED/blob/a962116f54bc3b62db46013849f0bf5b3ebabb73/wled00/bus_manager.cpp#L870-L876).
 
 **Planning Assumption:** The experimental target disables PSRAM because the
 eFuse report exposes no PSRAM capacity and the maintained WLED HD-WF2 profile
@@ -98,6 +129,11 @@ external PSRAM package exists on every HD-WF2 revision.
 prototype exception. Keep generic write targets disabled, preserve both local
 snapshots and the untouched factory `app1`, and complete restoration and
 electrical validation before broader hardware use.
+
+**Recommendation:** Before another panel test, measure 5 V at the panel's
+four-pin power connector under load. If the rail is correct, measure or trace
+OE, CLK, LAT, and one RGB lane across X1, the ribbon, and J1. Do not infer panel
+power from the controller's power LED.
 
 ## Required inspection record
 

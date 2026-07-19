@@ -12,20 +12,37 @@ remains local and ignored by Git.
 second complete 8 MB snapshot was captured. Immutable regions matched the first
 snapshot; runtime NVS accounted for the full-image hash difference. A restore
 slice for `app0` was extracted, and the untouched factory `app1` remains in
-flash. These are stronger recovery inputs, but restoration is still untested.
+flash. These are stronger recovery inputs; the app0-only recovery was later
+verified, while full-image restoration remains untested.
 
 **Verified Current Fact:** The smoke artifact was written only to `app0` at
 `0x10000`. The exact written range was read back and matched the compiled
 artifact SHA-256. See the activation manifest at
 `backups/manifests/flightwall-mini-hd-wf2-smoke-activation-20260718.json`.
 
+**Verified Current Fact:** The complete saved factory `app0` slice was later
+written back at `0x10000` and esptool verified all 2,883,584 bytes against
+SHA-256
+`ed3f4bc8d26c32ec674a5285882e34ec67c55ed89b88bcd3b0f3b84e1d9581b4`.
+The preserved OTA metadata selected valid `app0` sequence 7 over `app1`
+sequence 6. Esptool issued a hard reset after the restore, but no factory serial
+marker was captured and the owner observed the panel as blank. App0 binary
+restoration is therefore verified; factory application execution, full factory
+display behavior, and full-image restoration are not independently verified.
+
+**Verified Current Fact:** A subsequent standalone raw diagnostic was written
+only to app0. Its reviewed 263,696-byte post-flash readback matched SHA-256
+`732196319ebbfb488c7ecbe1ca0c32c1c44553ce506c9e6155782f3eddc20f66`.
+Factory app1 and every non-app0 region remain preserved. See
+`backups/manifests/flightwall-mini-hd-wf2-raw-hub75-diagnostic-20260719.json`.
+
 **Recommendation:** Treat recovery as a prerequisite to firmware development,
 not a final OTA feature.
 
 ## Pre-development backup procedure
 
-The controller and flash layout are now identified, but restoration remains
-unvalidated. On a dedicated development unit:
+The controller and flash layout are now identified, but full-image restoration
+remains unvalidated. On a dedicated development unit:
 
 1. Photograph labels, wiring, and connector orientation before disassembly.
 2. Capture chip identity, security fuses, boot output, partition map, and tool

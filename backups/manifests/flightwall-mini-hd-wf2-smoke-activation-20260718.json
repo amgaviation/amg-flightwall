@@ -25,11 +25,15 @@
   "serial_boot_marker": "AMG FlightWall: hardware smoke screen initialized",
   "serial_stability_seconds": 120,
   "unexpected_resets": 0,
-  "visual_validation": "pending_owner_observation",
-  "restore_tested": false,
+  "visual_validation": "failed_owner_observed_completely_blank_panel",
+  "restore_tested": true,
+  "restore_scope": "app0_only",
+  "restore_result": "factory_app0_binary_write_and_hash_verified_but_display_remained_blank",
   "notes": [
     "The owner explicitly authorized use of the sole controller after the documented residual risk was reported.",
     "Only app0 was written; bootloader, partition table, NVS, OTA metadata, app1, factory provisioning, and SPIFFS were preserved.",
-    "All binary snapshots and readbacks remain local and ignored by Git."
+    "All binary snapshots and readbacks remain local and ignored by Git.",
+    "The later owner observation confirmed a completely blank panel during this smoke test.",
+    "The saved factory app0 slice was later restored and verified, and esptool issued a hard reset. No factory serial marker was captured, so factory application execution and display behavior were not independently established."
   ]
 }

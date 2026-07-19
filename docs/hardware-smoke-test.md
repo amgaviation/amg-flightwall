@@ -25,12 +25,41 @@ The factory `app1` partition and every non-`app0` region were preserved. A
 
 **Verified Current Fact:** This proves boot and display-adapter initialization,
 not correct panel mapping, orientation, color order, brightness, refresh
-stability, or long-run compatibility. Visual acceptance remains pending the
-owner's panel observation.
+stability, or long-run compatibility. The initial visual acceptance later
+failed as recorded below.
 
-**Verified Current Fact:** The inspected controller is currently visible on the
-development Mac as `/dev/cu.usbmodem101`. The path may change after reconnect or
-reboot and must be re-identified before any approved hardware procedure.
+**Verified Current Fact:** The owner observed that smoke artifact as completely
+blank. Multiple single-variable DMA configuration tests were also blank. The
+complete saved factory `app0` slice was then restored at `0x10000`, verified
+against SHA-256
+`ed3f4bc8d26c32ec674a5285882e34ec67c55ed89b88bcd3b0f3b84e1d9581b4`,
+and esptool issued a hard reset. The owner observed the panel as blank after a
+full power cycle, but no factory serial marker was captured. This validates the
+app0 restore/write path; factory application execution and display behavior
+were not independently established.
+
+**Verified Current Fact:** A standalone raw HUB75 diagnostic was built without
+the MatrixPanel library or upstream FlightWall code. It directly programs the
+FM6124E/FM6126-family control words and scans the factory-binary-derived X1 pin
+profile at 128×64 and 1/32 scan. The reviewed 263,696-byte artifact has
+SHA-256
+`732196319ebbfb488c7ecbe1ca0c32c1c44553ce506c9e6155782f3eddc20f66`.
+It was written only to `app0` at `0x10000`, independently read back with the
+same hash, and produced continuing serial pattern and frame heartbeats. The
+owner observed no light, color, line, or flicker. This is a failed visual
+hardware test and is recorded in
+`backups/manifests/flightwall-mini-hd-wf2-raw-hub75-diagnostic-20260719.json`.
+
+**Verified Current Fact:** The independent raw scan eliminates the FlightWall
+application, renderer, DMA library, network, and API code from the active test
+path. It does not prove that 5 V reaches the panel or that HUB75 signals reach
+the panel connector. Those electrical measurements are now the next required
+evidence; additional firmware variants cannot distinguish the remaining power,
+continuity, level-shifter, and panel-electronics hypotheses.
+
+**Verified Current Fact:** The inspected controller most recently enumerated as
+`/dev/cu.usbmodem11201`. The path has changed after reconnects and must always
+be re-identified before an approved hardware procedure.
 
 **Verified Current Fact:** `esptool load_ram` can execute a specially built RAM
 image without writing flash, according to
@@ -86,11 +115,14 @@ Complete the visual record with photos/video for:
 - a successful power cycle;
 - later restoration of the factory image and factory behavior comparison.
 
-Any blank panel, scrambled mapping, unexpected color, unstable refresh, reset,
-heat, odor, or power anomaly is a failed test and requires immediate power-off.
+Any blank panel, scrambled mapping, unexpected color, unstable refresh, or
+reset is a failed test. Heat, odor, or a power anomaly also requires immediate
+power-off. The blank-panel failure above must remain unresolved until panel
+voltage/current and HUB75 continuity are measured.
 
 ## Open decision
 
-**Open Decision:** Approve the electrical test fixture and schedule a controlled
-factory-restoration rehearsal. The first activation no longer depends on a
-spare controller, but production release and generic flashing remain gated.
+**Open Decision:** Approve a meter-equipped electrical test fixture and measure
+panel-side 5 V under load before any more display firmware experiments. A full
+factory-image restoration rehearsal, production release, and generic flashing
+remain gated.
