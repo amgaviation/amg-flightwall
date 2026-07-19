@@ -2,16 +2,24 @@
 
 ## Current status
 
-**Verified Current Fact:** No AMG device has been inspected, backed up, flashed,
-or restored as part of this foundation work.
+**Verified Current Fact:** The factory-unmodified FlightWall Mini was inspected
+and its ESP32-S3 controller was identified read-only. One complete 8 MB flash
+snapshot was captured with esptool 5.3.1. The redacted manifest is stored at
+`backups/manifests/flightwall-mini-hd-wf2-20260718.json`; the binary remains
+local and ignored by Git.
+
+**Verified Current Fact:** No erase, upload, program, or flash operation was
+issued. Restoration has not been tested. Post-reset spot reads showed changes
+inside the runtime NVS area, so the snapshot is preserved but is not described
+as a twice-read or restore-validated recovery artifact.
 
 **Recommendation:** Treat recovery as a prerequisite to firmware development,
 not a final OTA feature.
 
 ## Pre-development backup procedure
 
-The exact commands remain intentionally open until the controller and flash
-layout are verified. On an authorized development unit:
+The controller and flash layout are now identified, but restoration remains
+unvalidated. On a dedicated development unit:
 
 1. Photograph labels, wiring, and connector orientation before disassembly.
 2. Capture chip identity, security fuses, boot output, partition map, and tool

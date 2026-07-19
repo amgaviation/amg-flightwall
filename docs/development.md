@@ -11,7 +11,8 @@ couple firmware or tooling to the AMG website application.
 2. Read this documentation and the nearest `AGENTS.md` before editing.
 3. Add or update an engineering record when new evidence changes an assumption.
 4. Keep changes small; never edit a captured upstream firmware snapshot.
-5. Add host tests for portable logic and target tests for hardware adapters.
+5. Add host tests for portable logic, compile checks for experimental adapters,
+   and target/HIL tests before hardware activation.
 6. Run formatting, static analysis, unit tests, build, and secret scanning.
 7. Record exact commands and distinguish simulated from hardware verification.
 8. Require review for security, storage layout, OTA, boot, or power changes.
@@ -23,8 +24,9 @@ git switch -c codex/<task-name>
 ./scripts/check.sh
 ```
 
-The current build has no third-party runtime dependency and performs no network,
-serial, USB, flash, or device operation.
+The host build has no third-party runtime dependency. The experimental embedded
+build downloads pinned toolchain/driver dependencies but performs no network,
+serial, USB, flash, or device operation at runtime because it only compiles.
 
 ## Coding rules
 
@@ -38,6 +40,12 @@ serial, USB, flash, or device operation.
 - Never log credentials, tokens, precise private locations, client records, or
   raw mission/crew data.
 - Put provider-specific payloads in adapters and normalize before domain use.
+
+**Target-boundary exception:** Arduino requires the free `setup()` and `loop()`
+entry points while application state persists between calls. The HD-WF2 target
+contains that lifetime in one function-local composition root. Inward modules
+still receive dependencies explicitly and must not discover or access that
+target runtime.
 
 ## Test pyramid
 

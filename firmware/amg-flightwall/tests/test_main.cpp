@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdint>
 #include <exception>
 #include <iostream>
@@ -12,6 +13,7 @@
 #include "amg/flightwall/renderer.hpp"
 #include "amg/flightwall/scene.hpp"
 #include "amg/flightwall/scenes.hpp"
+#include "amg/flightwall/target_profile.hpp"
 
 namespace {
 
@@ -171,6 +173,27 @@ void testApplicationRendersModes() {
   CHECK(display.litPixelCount() != classic_pixels);
 }
 
+void testHdWf2MiniProfile() {
+  constexpr TargetProfile profile = hdWf2MiniProfile();
+
+  CHECK(profile.display_width == 128);
+  CHECK(profile.display_height == 64);
+  CHECK(profile.scan_denominator == 32);
+  CHECK(profile.flash_bytes == 8U * 1024U * 1024U);
+  CHECK(profile.psram_enabled == false);
+  CHECK((profile.hub75.values() ==
+         std::array<int, 14>{2, 6, 10, 3, 7, 11, 39, 38, 37, 36, 21, 33, 35, 34}));
+  CHECK(profile.pins_are_unique());
+  CHECK(profile.uses_gpio(19) == false);
+  CHECK(profile.uses_gpio(20) == false);
+  CHECK(profile.partition_map.is_contiguous());
+  CHECK(profile.partition_map.entries[2].offset == 0x00010000U);
+  CHECK(profile.partition_map.entries[2].size == 0x002C0000U);
+  CHECK(profile.partition_map.entries[3].offset == 0x002D0000U);
+  CHECK(profile.partition_map.entries[3].size == 0x002C0000U);
+  CHECK(profile.partition_map.end_offset() == profile.flash_bytes);
+}
+
 }  // namespace
 
 int main() {
@@ -182,6 +205,7 @@ int main() {
     run("trigger priority", testTriggerPriority);
     run("plugin registration", testPluginRegistration);
     run("application renders modes", testApplicationRendersModes);
+    run("HD-WF2 Mini profile", testHdWf2MiniProfile);
     std::cout << tests_run << " tests passed\n";
     return 0;
   } catch (const std::exception& error) {
