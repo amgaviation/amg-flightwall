@@ -1,0 +1,145 @@
+#include "amg/flightwall/renderer.hpp"
+
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <cstdlib>
+
+namespace amg::flightwall {
+namespace {
+
+using Glyph = std::array<std::uint8_t, 7>;
+
+constexpr Glyph glyphFor(char character) noexcept {
+  switch (character) {
+    case 'A': return {0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11};
+    case 'B': return {0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E};
+    case 'C': return {0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E};
+    case 'D': return {0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E};
+    case 'E': return {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F};
+    case 'F': return {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10};
+    case 'G': return {0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0F};
+    case 'H': return {0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11};
+    case 'I': return {0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E};
+    case 'J': return {0x07, 0x02, 0x02, 0x02, 0x12, 0x12, 0x0C};
+    case 'K': return {0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11};
+    case 'L': return {0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F};
+    case 'M': return {0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11};
+    case 'N': return {0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11};
+    case 'O': return {0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E};
+    case 'P': return {0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10};
+    case 'Q': return {0x0E, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0D};
+    case 'R': return {0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11};
+    case 'S': return {0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E};
+    case 'T': return {0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04};
+    case 'U': return {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E};
+    case 'V': return {0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04};
+    case 'W': return {0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0A};
+    case 'X': return {0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11};
+    case 'Y': return {0x11, 0x11, 0x0A, 0x04, 0x04, 0x04, 0x04};
+    case 'Z': return {0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F};
+    case '0': return {0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E};
+    case '1': return {0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E};
+    case '2': return {0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F};
+    case '3': return {0x1E, 0x01, 0x01, 0x0E, 0x01, 0x01, 0x1E};
+    case '4': return {0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02};
+    case '5': return {0x1F, 0x10, 0x10, 0x1E, 0x01, 0x01, 0x1E};
+    case '6': return {0x0E, 0x10, 0x10, 0x1E, 0x11, 0x11, 0x0E};
+    case '7': return {0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08};
+    case '8': return {0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E};
+    case '9': return {0x0E, 0x11, 0x11, 0x0F, 0x01, 0x01, 0x0E};
+    case '-': return {0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00};
+    case ':': return {0x00, 0x04, 0x04, 0x00, 0x04, 0x04, 0x00};
+    case '.': return {0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C};
+    case '/': return {0x01, 0x02, 0x02, 0x04, 0x08, 0x08, 0x10};
+    case ' ': return {};
+    default: return {0x1F, 0x11, 0x02, 0x04, 0x00, 0x04, 0x00};
+  }
+}
+
+}  // namespace
+
+Renderer::Renderer(Display& display) noexcept : display_(display) {}
+
+int Renderer::width() const noexcept { return display_.width(); }
+int Renderer::height() const noexcept { return display_.height(); }
+void Renderer::clear(const Color color) noexcept { display_.clear(color); }
+void Renderer::pixel(const int x, const int y, const Color color) noexcept { display_.setPixel(x, y, color); }
+
+void Renderer::line(int x0, int y0, const int x1, const int y1, const Color color) noexcept {
+  const int dx = std::abs(x1 - x0);
+  const int sx = x0 < x1 ? 1 : -1;
+  const int dy = -std::abs(y1 - y0);
+  const int sy = y0 < y1 ? 1 : -1;
+  int error = dx + dy;
+
+  while (true) {
+    pixel(x0, y0, color);
+    if (x0 == x1 && y0 == y1) {
+      break;
+    }
+    const int doubled_error = 2 * error;
+    if (doubled_error >= dy) {
+      error += dy;
+      x0 += sx;
+    }
+    if (doubled_error <= dx) {
+      error += dx;
+      y0 += sy;
+    }
+  }
+}
+
+void Renderer::rectangle(const int x, const int y, const int width, const int height, const Color color) noexcept {
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+  line(x, y, x + width - 1, y, color);
+  line(x, y + height - 1, x + width - 1, y + height - 1, color);
+  line(x, y, x, y + height - 1, color);
+  line(x + width - 1, y, x + width - 1, y + height - 1, color);
+}
+
+void Renderer::fillRectangle(const int x, const int y, const int width, const int height, const Color color) noexcept {
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+  for (int row = 0; row < height; ++row) {
+    line(x, y + row, x + width - 1, y + row, color);
+  }
+}
+
+void Renderer::text(const int x, const int y, const std::string_view value, const Color color, const int scale) noexcept {
+  if (scale <= 0) {
+    return;
+  }
+  int cursor = x;
+  for (const char character : value) {
+    glyph(cursor, y, character, color, scale);
+    cursor += 6 * scale;
+  }
+}
+
+int Renderer::textWidth(const std::string_view value, const int scale) const noexcept {
+  if (value.empty() || scale <= 0) {
+    return 0;
+  }
+  return static_cast<int>(value.size()) * 6 * scale - scale;
+}
+
+void Renderer::present() noexcept { display_.present(); }
+
+void Renderer::glyph(const int x, const int y, char character, const Color color, const int scale) noexcept {
+  character = static_cast<char>(std::toupper(static_cast<unsigned char>(character)));
+  const Glyph bitmap = glyphFor(character);
+  for (int row = 0; row < 7; ++row) {
+    for (int column = 0; column < 5; ++column) {
+      if ((bitmap[static_cast<std::size_t>(row)] & (1U << (4 - column))) == 0) {
+        continue;
+      }
+      fillRectangle(x + column * scale, y + row * scale, scale, scale, color);
+    }
+  }
+}
+
+}  // namespace amg::flightwall

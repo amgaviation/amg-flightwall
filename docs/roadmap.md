@@ -4,14 +4,17 @@ Phases are evidence gates, not calendar promises. A later phase may prototype
 behind interfaces, but it cannot be called complete while an earlier safety or
 recovery gate is open.
 
-## Phase 1 — Foundation (in progress)
+## Phase 1 — Foundation (prototype complete; approval gates open)
 
 Delivered here: project boundary, architecture, development/build/recovery
 guides, hardware evidence record, roadmap, and decision log.
 
+Verified here: standalone repository, documented project boundary, architecture,
+host build, CI policy, recovery plan, and physical-inspection record.
+
 Exit evidence still required:
 
-- approved standalone repository, owners, license, threat model, and CI policy;
+- approved owners, product license, threat model, and release policy;
 - physical hardware inspection and validated original-firmware restore;
 - approved target/toolchain decision and Classic Mode behavior capture;
 - initial requirements traceability matrix.
@@ -22,6 +25,12 @@ Build the hardware abstraction, renderer, scene manager, configuration store,
 plugin registry, logging, health model, and simulator. Exit requires host tests,
 target build, renderer snapshots, memory budget, watchdog/fault tests, and an
 architecture review on an approved development device.
+
+**Current prototype evidence:** display port, framebuffer, renderer, scene
+manager, mode controller, plugin registry, Classic/Operations sample scenes,
+host tests, and generated simulator frames. Configuration persistence, logging,
+health reporting, target adapters, target measurements, and hardware review are
+not implemented.
 
 ## Phase 3 — Classic Mode
 

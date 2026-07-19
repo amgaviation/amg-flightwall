@@ -2,8 +2,8 @@
 
 ## Scope
 
-This directory is a separate project boundary inside the context repository.
-Changes must not couple firmware or tooling to the parent Next.js application.
+This standalone repository is the FlightWall project boundary. Changes must not
+couple firmware or tooling to the AMG website application.
 
 ## Workflow
 
@@ -15,6 +15,16 @@ Changes must not couple firmware or tooling to the parent Next.js application.
 6. Run formatting, static analysis, unit tests, build, and secret scanning.
 7. Record exact commands and distinguish simulated from hardware verification.
 8. Require review for security, storage layout, OTA, boot, or power changes.
+
+## Current host workflow
+
+```sh
+git switch -c codex/<task-name>
+./scripts/check.sh
+```
+
+The current build has no third-party runtime dependency and performs no network,
+serial, USB, flash, or device operation.
 
 ## Coding rules
 
