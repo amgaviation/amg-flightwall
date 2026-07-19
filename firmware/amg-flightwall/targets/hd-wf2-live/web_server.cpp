@@ -70,7 +70,7 @@ bool CommandQueue::pop(Command& command) {
   return true;
 }
 
-bool WebServer::authorized(AsyncWebServerRequest* request) const {
+bool WebServer::authorized(AsyncWebServerRequest* request, RouteClass route) const {
   String admin_hash;
   bool setup_mode = false;
   {
@@ -78,9 +78,28 @@ bool WebServer::authorized(AsyncWebServerRequest* request) const {
     admin_hash = state_.admin_hash;
     setup_mode = state_.setup_mode;
   }
-  if (setup_mode || admin_hash.length() == 0) {
-    return true;  // captive portal, or first run before a password exists
+
+  const bool claimed = admin_hash.length() != 0;
+  if (!claimed) {
+    // Trust-on-first-use, tightly scoped. Before an admin password exists the
+    // ONLY unauthenticated actions are claiming the device (setting the first
+    // password via /api/secrets) and Wi-Fi provisioning while the AP portal is
+    // up. Everything privileged (OTA, config, reboot, scene control) stays
+    // closed so a LAN attacker cannot flash firmware or steal config in the
+    // pre-claim window.
+    switch (route) {
+      case RouteClass::kClaim:
+        return true;
+      case RouteClass::kProvision:
+        return setup_mode;
+      case RouteClass::kPrivileged:
+        return false;
+    }
+    return false;
   }
+
+  // Claimed: X-Auth is mandatory for every mutating route, with no setup_mode
+  // exemption — a recovery AP does not disable authentication.
   if (!request->hasHeader("X-Auth")) {
     return false;
   }
@@ -159,12 +178,13 @@ void WebServer::registerApi() {
         response += reboot_required ? "true}" : "false}";
         request->send(200, kJsonContentType, response);
       });
+  config_handler->setMaxContentLength(4096);
   config_handler->setMethod(HTTP_PUT);
   server_.addHandler(config_handler);
 
   auto* secrets_handler = new AsyncCallbackJsonWebHandler(
       "/api/secrets", [this](AsyncWebServerRequest* request, JsonVariant& json) {
-        if (!authorized(request)) {
+        if (!authorized(request, RouteClass::kClaim)) {
           sendJsonError(request, 401, "unauthorized");
           return;
         }
@@ -177,6 +197,7 @@ void WebServer::registerApi() {
         serializeJson(json, command.json);
         enqueueOrFail(request, std::move(command));
       });
+  secrets_handler->setMaxContentLength(2048);
   secrets_handler->setMethod(HTTP_POST);
   server_.addHandler(secrets_handler);
 
@@ -202,6 +223,7 @@ void WebServer::registerApi() {
         command.duration_ms = static_cast<std::uint32_t>(duration_s > 0 ? duration_s : 10) * 1000U;
         enqueueOrFail(request, std::move(command));
       });
+  activate_handler->setMaxContentLength(1024);
   activate_handler->setMethod(HTTP_POST);
   server_.addHandler(activate_handler);
 
@@ -221,6 +243,7 @@ void WebServer::registerApi() {
         serializeJson(json, command.json);
         enqueueOrFail(request, std::move(command));
       });
+  message_handler->setMaxContentLength(2048);
   message_handler->setMethod(HTTP_POST);
   server_.addHandler(message_handler);
 
@@ -240,6 +263,7 @@ void WebServer::registerApi() {
         serializeJson(json, command.json);
         enqueueOrFail(request, std::move(command));
       });
+  notify_handler->setMaxContentLength(2048);
   notify_handler->setMethod(HTTP_POST);
   server_.addHandler(notify_handler);
 
@@ -275,7 +299,7 @@ void WebServer::registerApi() {
       });
 
   server_.on("/api/wifi/scan", HTTP_GET, [this](AsyncWebServerRequest* request) {
-    if (!authorized(request)) {
+    if (!authorized(request, RouteClass::kProvision)) {
       sendJsonError(request, 401, "unauthorized");
       return;
     }
@@ -306,7 +330,7 @@ void WebServer::registerApi() {
 
   auto* wifi_handler = new AsyncCallbackJsonWebHandler(
       "/api/wifi", [this](AsyncWebServerRequest* request, JsonVariant& json) {
-        if (!authorized(request)) {
+        if (!authorized(request, RouteClass::kProvision)) {
           sendJsonError(request, 401, "unauthorized");
           return;
         }
@@ -325,6 +349,7 @@ void WebServer::registerApi() {
         }
         request->send(200, kJsonContentType, "{\"ok\":true,\"rebooting\":true}");
       });
+  wifi_handler->setMaxContentLength(1024);
   wifi_handler->setMethod(HTTP_POST);
   server_.addHandler(wifi_handler);
 
@@ -417,11 +442,31 @@ bool WebServer::hasEventClients() const noexcept {
   return const_cast<AsyncEventSource&>(events_).count() > 0;
 }
 
+bool WebServer::frameChannelReady() const noexcept {
+  auto& events = const_cast<AsyncEventSource&>(events_);
+  if (events.count() == 0) {
+    return false;
+  }
+  // Backpressure: if any client already has queued packets, it is not draining
+  // fast enough for ~22 KB frames — drop this frame rather than growing the
+  // per-client queue on the internal (no-PSRAM) heap.
+  if (events.avgPacketsWaiting() > 1) {
+    return false;
+  }
+  // Absolute heap floor independent of the queue estimate.
+  constexpr std::uint32_t kHeapFloorBytes = 48u * 1024u;
+  return ESP.getFreeHeap() > kHeapFloorBytes;
+}
+
 void WebServer::sendLogLine(const char* line) { events_.send(line, "log", 0); }
 
 void WebServer::sendStatus(const String& json) { events_.send(json.c_str(), "status", 0); }
 
 void WebServer::sendFrame(const char* base64_payload) {
+  // Frames are ephemeral: only enqueue when the channel is genuinely ready.
+  if (!frameChannelReady()) {
+    return;
+  }
   events_.send(base64_payload, "frame", 0);
 }
 

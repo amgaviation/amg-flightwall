@@ -20,9 +20,15 @@ void OtaUpdater::fail(const char* reason) {
 void OtaUpdater::handleUpload(AsyncWebServerRequest* request, const String& filename,
                               const std::size_t index, std::uint8_t* data,
                               const std::size_t length, const bool final) {
-  (void)request;
-
   if (index == 0) {
+    if (in_progress_) {
+      // Another request already owns the flash updater. Reject this upload
+      // without touching the in-flight state; its completion handler answers
+      // 409 because its request pointer will not match owner_.
+      log_.logf("ota: rejected concurrent upload (%s)", filename.c_str());
+      return;
+    }
+    owner_ = request;
     failed_ = false;
     error_ = "";
     sha256_hex_ = "";
@@ -35,6 +41,13 @@ void OtaUpdater::handleUpload(AsyncWebServerRequest* request, const String& file
     in_progress_ = true;
     mbedtls_sha256_init(&sha_context_);
     mbedtls_sha256_starts(&sha_context_, 0);
+  }
+
+  // Only chunks from the owning request may drive the flash write. Stray chunks
+  // from a rejected concurrent upload (whose index==0 was refused above) land
+  // here with a different request pointer and are ignored.
+  if (request != owner_) {
+    return;
   }
 
   if (failed_ || !in_progress_) {
@@ -78,6 +91,13 @@ void OtaUpdater::handleUpload(AsyncWebServerRequest* request, const String& file
 }
 
 void OtaUpdater::handleRequest(AsyncWebServerRequest* request) {
+  if (request != owner_) {
+    // This request never became the update owner — either a concurrent upload
+    // rejected while another update was in flight, or a POST with no image.
+    request->send(409, "application/json",
+                  "{\"ok\":false,\"error\":\"update already in progress\"}");
+    return;
+  }
   if (failed_) {
     String body = "{\"ok\":false,\"error\":\"";
     body += error_;

@@ -39,6 +39,11 @@ class OtaUpdater {
   void fail(const char* reason);
 
   LogBuffer& log_;
+  // Identifies the request that owns the in-flight update. Async upload/complete
+  // callbacks run serialized on the AsyncTCP task, so a plain pointer is safe;
+  // it is only compared, never dereferenced. A concurrent upload whose request
+  // differs is rejected instead of resetting the owner's flash state.
+  AsyncWebServerRequest* owner_{nullptr};
   bool in_progress_{false};
   bool failed_{false};
   String error_{};

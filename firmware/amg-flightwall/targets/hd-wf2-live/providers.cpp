@@ -2,9 +2,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 
+#include <Arduino.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 
 #if defined(AMG_CERT_BUNDLE_EMBEDDED)
@@ -16,6 +20,76 @@ namespace amg::flightwall::live {
 namespace {
 
 constexpr std::uint16_t kHttpTimeoutMs = 8000;
+
+// Bounded streamed-read budget shared by every provider. A slow or hostile
+// endpoint must not stall the render loop or compound across the three pollers,
+// so each fetch aborts once the wall-clock deadline (measured from fetch start)
+// or the per-endpoint byte cap is reached. Caps are sized a little above the
+// largest realistic payload for each endpoint.
+constexpr std::uint32_t kReadDeadlineMs = 10000;
+constexpr std::size_t kFlightsMaxBytes = 48U * 1024U;
+constexpr std::size_t kMetarMaxBytes = 8U * 1024U;
+constexpr std::size_t kAmgMaxBytes = 16U * 1024U;
+
+// Wraps the HTTP body stream so a streamed JSON parse is bounded by both a
+// wall-clock deadline and a byte cap. Every byte ArduinoJson consumes passes
+// through readBytes(); once either limit is reached the reader reports
+// end-of-input, so deserialization aborts with a typed error that the caller
+// maps to a bounded-read failure without blocking further.
+class BoundedStream final : public Stream {
+ public:
+  BoundedStream(Stream& inner, const std::size_t max_bytes,
+                const std::uint32_t deadline_ms) noexcept
+      : inner_(inner), max_bytes_(max_bytes), deadline_ms_(deadline_ms) {}
+
+  [[nodiscard]] bool overCap() const noexcept { return over_cap_; }
+  [[nodiscard]] bool timedOut() const noexcept { return timed_out_; }
+
+  int available() override { return (over_cap_ || timed_out_) ? 0 : inner_.available(); }
+  int peek() override { return inner_.peek(); }
+
+  int read() override {
+    char c;
+    return readBytes(&c, 1) == 1 ? static_cast<unsigned char>(c) : -1;
+  }
+
+  size_t readBytes(char* buffer, size_t length) override {
+    if (!withinBudget()) {
+      return 0;
+    }
+    const std::size_t remaining = max_bytes_ - bytes_read_;
+    const size_t capped = static_cast<size_t>(std::min<std::size_t>(length, remaining));
+    const size_t count = inner_.readBytes(buffer, capped);
+    bytes_read_ += count;
+    return count;
+  }
+
+  size_t write(uint8_t) override { return 0; }
+  size_t write(const uint8_t*, size_t) override { return 0; }
+
+ private:
+  // Latches the abort reason and returns false once the byte cap is reached or
+  // the wall-clock deadline has passed. Signed millis() difference tolerates the
+  // 32-bit wraparound.
+  bool withinBudget() noexcept {
+    if (bytes_read_ >= max_bytes_) {
+      over_cap_ = true;
+      return false;
+    }
+    if (static_cast<std::int32_t>(millis() - deadline_ms_) >= 0) {
+      timed_out_ = true;
+      return false;
+    }
+    return true;
+  }
+
+  Stream& inner_;
+  std::size_t max_bytes_;
+  std::uint32_t deadline_ms_;
+  std::size_t bytes_read_{0};
+  bool over_cap_{false};
+  bool timed_out_{false};
+};
 
 void configureTls(WiFiClientSecure& client, const bool insecure) {
 #if defined(AMG_CERT_BUNDLE_EMBEDDED)
@@ -101,6 +175,7 @@ bool FlightProvider::enabled() const {
 }
 
 bool FlightProvider::fetch(const std::uint64_t now_ms) {
+  const std::uint32_t fetch_start_ms = millis();
   const DeviceSettings& settings = store_.settings();
   char url[128];
   snprintf(url, sizeof(url), "https://api.adsb.lol/v2/point/%.4f/%.4f/%d",
@@ -139,11 +214,18 @@ bool FlightProvider::fetch(const std::uint64_t now_ms) {
   aircraft_filter["track"] = true;
 
   JsonDocument document;
+  BoundedStream bounded(http.getStream(), kFlightsMaxBytes, fetch_start_ms + kReadDeadlineMs);
   const DeserializationError error =
-      deserializeJson(document, http.getStream(), DeserializationOption::Filter(filter));
+      deserializeJson(document, bounded, DeserializationOption::Filter(filter));
   http.end();
   if (error != DeserializationError::Ok) {
-    log_.logf("flights: parse failed (%s)", error.c_str());
+    if (bounded.overCap()) {
+      log_.append("flights: response exceeded byte cap");
+    } else if (bounded.timedOut()) {
+      log_.append("flights: read deadline exceeded");
+    } else {
+      log_.logf("flights: parse failed (%s)", error.c_str());
+    }
     snapshot_.valid = false;
     updated_ = true;
     return false;
@@ -217,6 +299,7 @@ std::uint32_t MetarProvider::intervalMs() const {
 bool MetarProvider::enabled() const { return store_.settings().metar.station.length() >= 3; }
 
 bool MetarProvider::fetch(const std::uint64_t now_ms) {
+  const std::uint32_t fetch_start_ms = millis();
   const MetarSettings& metar = store_.settings().metar;
   String url = "https://aviationweather.gov/api/data/metar?format=json&ids=";
   url += metar.station;
@@ -243,12 +326,37 @@ bool MetarProvider::fetch(const std::uint64_t now_ms) {
     return false;
   }
 
+  // Bound the document to the fields actually read below (the API returns a
+  // one-element array of report objects).
+  JsonDocument filter;
+  JsonObject report_filter = filter.add<JsonObject>();
+  report_filter["icaoId"] = true;
+  report_filter["rawOb"] = true;
+  report_filter["temp"] = true;
+  report_filter["dewp"] = true;
+  report_filter["wspd"] = true;
+  report_filter["wdir"] = true;
+  report_filter["visib"] = true;
+  report_filter["fltCat"] = true;
+  report_filter["fltcat"] = true;
+  JsonObject cloud_filter = report_filter["clouds"].add<JsonObject>();
+  cloud_filter["cover"] = true;
+  cloud_filter["base"] = true;
+
   JsonDocument document;
-  const DeserializationError error = deserializeJson(document, http.getStream());
+  BoundedStream bounded(http.getStream(), kMetarMaxBytes, fetch_start_ms + kReadDeadlineMs);
+  const DeserializationError error =
+      deserializeJson(document, bounded, DeserializationOption::Filter(filter));
   http.end();
   if (error != DeserializationError::Ok || !document.is<JsonArrayConst>() ||
       document.as<JsonArrayConst>().size() == 0) {
-    log_.append("metar: parse failed or empty report");
+    if (bounded.overCap()) {
+      log_.append("metar: response exceeded byte cap");
+    } else if (bounded.timedOut()) {
+      log_.append("metar: read deadline exceeded");
+    } else {
+      log_.append("metar: parse failed or empty report");
+    }
     snapshot_.valid = false;
     updated_ = true;
     return false;
@@ -342,6 +450,7 @@ bool AmgProvider::enabled() const {
 }
 
 bool AmgProvider::fetch(const std::uint64_t now_ms) {
+  const std::uint32_t fetch_start_ms = millis();
   const AmgSettings& amg = store_.settings().amg;
   String url = amg.base_url;
   if (!url.endsWith("/")) {
@@ -349,29 +458,30 @@ bool AmgProvider::fetch(const std::uint64_t now_ms) {
   }
   url += "api/flightwall/summary";
 
-  const bool https = url.startsWith("https://");
-  WiFiClientSecure secure_client;
-  WiFiClient plain_client;
+  // The bridge bearer token must never travel in cleartext. If the resolved
+  // base_url is not https we refuse the fetch outright rather than attach the
+  // Authorization header over an unencrypted link. Logged without the token.
+  if (!url.startsWith("https://")) {
+    log_.append("amg: base_url is not https; refusing to send bridge token");
+    snapshot_.valid = false;
+    updated_ = true;
+    return false;
+  }
+
+  WiFiClientSecure client;
+  configureTls(client, insecureTls());
   HTTPClient http;
   http.setTimeout(kHttpTimeoutMs);
   http.setConnectTimeout(kHttpTimeoutMs);
   http.useHTTP10(true);
-
-  bool began = false;
-  if (https) {
-    configureTls(secure_client, insecureTls());
-    began = http.begin(secure_client, url);
-  } else {
-    began = http.begin(plain_client, url);
-  }
-  if (!began) {
+  if (!http.begin(client, url)) {
     log_.append("amg: http begin failed");
     snapshot_.valid = false;
     updated_ = true;
     return false;
   }
 
-  // Token travels only in this request header; it is never logged.
+  // Token travels only in this https request header; it is never logged.
   http.addHeader("Authorization", String("Bearer ") + store_.amgToken());
   const int status = http.GET();
   if (status != 200) {
@@ -382,11 +492,41 @@ bool AmgProvider::fetch(const std::uint64_t now_ms) {
     return false;
   }
 
+  // Bound the document to the fields consumed below.
+  JsonDocument filter;
+  filter["requests"]["new_count"] = true;
+  JsonObject latest_filter = filter["requests"]["latest"].add<JsonObject>();
+  latest_filter["label"] = true;
+  latest_filter["name"] = true;
+  latest_filter["age_min"] = true;
+  filter["missions"]["active_count"] = true;
+  JsonObject mission_filter = filter["missions"]["items"].add<JsonObject>();
+  mission_filter["label"] = true;
+  mission_filter["status"] = true;
+  mission_filter["eta_min"] = true;
+  filter["submissions"]["cursor"] = true;
+  JsonObject submission_filter = filter["submissions"]["recent"].add<JsonObject>();
+  submission_filter["kind"] = true;
+  submission_filter["name"] = true;
+  submission_filter["age_min"] = true;
+  filter["revenue"]["today_cents"] = true;
+  filter["revenue"]["mtd_cents"] = true;
+  filter["revenue"]["currency"] = true;
+  filter["site"]["state"] = true;
+
   JsonDocument document;
-  const DeserializationError error = deserializeJson(document, http.getStream());
+  BoundedStream bounded(http.getStream(), kAmgMaxBytes, fetch_start_ms + kReadDeadlineMs);
+  const DeserializationError error =
+      deserializeJson(document, bounded, DeserializationOption::Filter(filter));
   http.end();
   if (error != DeserializationError::Ok) {
-    log_.logf("amg: parse failed (%s)", error.c_str());
+    if (bounded.overCap()) {
+      log_.append("amg: response exceeded byte cap");
+    } else if (bounded.timedOut()) {
+      log_.append("amg: read deadline exceeded");
+    } else {
+      log_.logf("amg: parse failed (%s)", error.c_str());
+    }
     snapshot_.valid = false;
     updated_ = true;
     return false;

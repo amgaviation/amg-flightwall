@@ -12,6 +12,7 @@
 
 #include <Arduino.h>
 
+#include <array>
 #include <cstring>
 #include <ctime>
 #include <vector>
@@ -291,8 +292,10 @@ class LiveRuntime final {
     payload.scroll = object["scroll"].is<bool>() ? object["scroll"].as<bool>() : true;
     const int duration_s = object["duration_s"].is<int>() ? object["duration_s"].as<int>() : 15;
     payload.duration_ms = static_cast<std::uint32_t>(duration_s > 0 ? duration_s : 15) * 1000U;
-    overlay_message_scene_.setMessage(payload);
-    if (rotator_.pushOverlay(overlay_message_scene_, payload.duration_ms, 1)) {
+    MessageScene& slot = message_overlay_pool_[message_overlay_index_];
+    slot.setMessage(payload);
+    if (rotator_.pushOverlay(slot, payload.duration_ms, 1)) {
+      message_overlay_index_ = (message_overlay_index_ + 1) % message_overlay_pool_.size();
       log_.append("message: overlay shown");
     } else {
       log_.append("message: overlay queue full");
@@ -329,8 +332,10 @@ class LiveRuntime final {
   }
 
   void showNotification(const NotificationEvent& event) {
-    notification_scene_.setNotification(event);
-    if (rotator_.pushOverlay(notification_scene_, event.duration_ms, event.priority)) {
+    NotificationScene& slot = notification_pool_[notification_index_];
+    slot.setNotification(event);
+    if (rotator_.pushOverlay(slot, event.duration_ms, event.priority)) {
+      notification_index_ = (notification_index_ + 1) % notification_pool_.size();
       log_.logf("notify: %s", event.title.c_str());
     } else {
       log_.append("notify: overlay queue full, dropped");
@@ -511,6 +516,12 @@ class LiveRuntime final {
   }
 
   void sendFrameEvent() {
+    // Skip the encode+base64 work entirely if the channel can't take a frame
+    // right now (no client, a client backing up, or low heap). Frames are
+    // ephemeral, so dropping is always correct.
+    if (!web_.frameChannelReady()) {
+      return;
+    }
     hub75_.encodeRgb565(frame_rgb565_);
     const std::size_t needed = 4 * ((frame_rgb565_.size() + 2) / 3) + 1;
     frame_base64_.resize(needed);
@@ -550,11 +561,20 @@ class LiveRuntime final {
   MetarScene metar_scene_{};
   AmgOpsScene amg_ops_scene_{};
   AmgMissionBoardScene mission_board_scene_{};
-  MessageScene message_scene_{};          // playlist slot
-  MessageScene overlay_message_scene_{};  // POST /api/message overlays
+  MessageScene message_scene_{};  // playlist slot
   CountdownScene countdown_scene_{};
-  NotificationScene notification_scene_{};
   SceneRotator rotator_{};
+
+  // Overlay scene pools. A queued overlay in the rotator holds a Scene* into
+  // one of these slots, so concurrently-queued overlays must not alias one
+  // shared object (that would make an earlier banner render a later one's
+  // content). Each pool is sized to the rotator's overlay capacity and the
+  // round-robin index advances ONLY on a successful push, which guarantees the
+  // slot handed out is never one still referenced by a live overlay.
+  std::array<MessageScene, SceneRotator::max_overlays> message_overlay_pool_{};
+  std::size_t message_overlay_index_{0};
+  std::array<NotificationScene, SceneRotator::max_overlays> notification_pool_{};
+  std::size_t notification_index_{0};
 
   FlightProvider flight_provider_{store_, log_};
   MetarProvider metar_provider_{store_, log_};

@@ -7,8 +7,15 @@
 // return immediately — the loop task drains the queue and applies changes.
 //
 // Auth: mutating routes require header `X-Auth: <sha256(admin_password)>`
-// compared constant-time against the stored hash. Exceptions: AP setup mode,
-// and first-run before any admin password exists (so the UI can create one).
+// compared constant-time against the stored hash. Once an admin password is
+// set ("claimed"), EVERY mutating route requires X-Auth — including while a
+// recovery AP is up (a claimed owner authenticates with their password from
+// the AP-served UI). Before the device is claimed (admin_hash empty) only two
+// narrow exemptions exist: POST /api/secrets (to set the first password —
+// trust-on-first-use) and the Wi-Fi provisioning routes while in AP setup
+// mode. OTA, config, reboot, message, notify, and scene control are NEVER
+// reachable unauthenticated, closing the first-run LAN race and the
+// recovery-AP auth bypass.
 //
 // SSE /api/events channels: `log` (line per event), `status` (every 5 s),
 // `frame` (base64 RGB565, ~500 ms cadence, only while clients are connected).
@@ -77,12 +84,26 @@ class WebServer {
 
   // --- SSE senders; loop task only ---
   [[nodiscard]] bool hasEventClients() const noexcept;
+  // True only when at least one client is connected, its send queue is not
+  // backing up, and free heap is above a safety floor. The ~22 KB frame events
+  // must be dropped (never queued) when a client stalls, or the no-PSRAM heap
+  // is exhausted. Checked before the caller spends CPU encoding a frame.
+  [[nodiscard]] bool frameChannelReady() const noexcept;
   void sendLogLine(const char* line);
   void sendStatus(const String& json);
   void sendFrame(const char* base64_payload);
 
  private:
-  [[nodiscard]] bool authorized(AsyncWebServerRequest* request) const;
+  // Route sensitivity classes for authorization.
+  enum class RouteClass {
+    kPrivileged,  // config/ota/reboot/message/notify/scene — always needs auth
+                  // once claimed; never open before claiming.
+    kClaim,       // POST /api/secrets — open only while unclaimed (TOFU).
+    kProvision,   // wifi scan/join — open only in AP setup mode while unclaimed.
+  };
+
+  [[nodiscard]] bool authorized(AsyncWebServerRequest* request,
+                                RouteClass route = RouteClass::kPrivileged) const;
   void enqueueOrFail(AsyncWebServerRequest* request, Command command);
   void registerAssets();
   void registerApi();

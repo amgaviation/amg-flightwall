@@ -380,13 +380,31 @@ bool SettingsStore::setWifiCredentials(const String& ssid, const String& passwor
   if (!ready_ || ssid.length() == 0 || ssid.length() > 32 || password.length() > 64) {
     return false;
   }
-  const bool stored = preferences_.putString(kWifiSsidKey, ssid) == ssid.length() &&
-                      preferences_.putString(kWifiPassKey, password) == password.length();
-  if (stored) {
-    wifi_ssid_ = ssid;
-    wifi_pass_ = password;
+
+  // SSID and password live in two independent NVS keys, so the pair is written
+  // in two steps. Snapshot the prior SSID and roll it back if the password
+  // write fails — otherwise a partial write would persist the new SSID against
+  // the previous (untouched) password, a mismatched pair loaded on next boot.
+  const String prev_ssid = wifi_ssid_;
+
+  if (preferences_.putString(kWifiSsidKey, ssid) != ssid.length()) {
+    // First write did not commit; the key keeps its prior value. Nothing to undo.
+    return false;
   }
-  return stored;
+  if (preferences_.putString(kWifiPassKey, password) != password.length()) {
+    // Password write failed; the password key still holds the prior value, so
+    // restore the SSID to the prior value to keep the persisted pair consistent.
+    if (prev_ssid.length() > 0) {
+      preferences_.putString(kWifiSsidKey, prev_ssid);
+    } else {
+      preferences_.remove(kWifiSsidKey);
+    }
+    return false;
+  }
+
+  wifi_ssid_ = ssid;
+  wifi_pass_ = password;
+  return true;
 }
 
 bool SettingsStore::setAmgToken(const String& token) {
